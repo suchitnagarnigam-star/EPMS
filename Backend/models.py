@@ -147,6 +147,13 @@ class WorkSyncItem(BaseModel):
     def validate_datetime(cls, v: Any) -> Optional[datetime]:
         return parse_datetime_safe(v)
 
+    @field_validator('ward', 'zone', mode='before')
+    @classmethod
+    def coerce_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        return str(v)
+
 class QualitySyncItem(BaseModel):
     source_sheet: Optional[str] = Field(None, validation_alias=AliasChoices('source_sheet', '_source_sheet'))
     source_row: Optional[int] = Field(None, validation_alias=AliasChoices('source_row', '_source_row'))
@@ -161,6 +168,13 @@ class QualitySyncItem(BaseModel):
     @classmethod
     def validate_datetime(cls, v: Any) -> Optional[datetime]:
         return parse_datetime_safe(v)
+
+    @field_validator('raw_ward', 'raw_zone', mode='before')
+    @classmethod
+    def coerce_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        return str(v)
 
     model_config = {
         "extra": "allow"
