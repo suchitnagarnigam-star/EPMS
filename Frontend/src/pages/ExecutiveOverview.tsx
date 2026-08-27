@@ -156,10 +156,9 @@ export default function ExecutiveOverview() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Filters */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{ background: '#161616', border: '1px solid #222' }}>
+            <div className="flex items-center gap-1.5">
               <Filter size={12} color="#505050" />
-              <select className="bg-transparent outline-none text-[11px] cursor-pointer" style={{ color: '#808080' }}
-                      value={branch} onChange={e => setBranch(e.target.value)}>
+              <select className="input-dark text-[11px] py-1.5" value={branch} onChange={e => setBranch(e.target.value)}>
                 <option value="All">All Branches</option>
                 <option>B&R</option><option>O&M</option><option>Light</option><option>SWM</option>
               </select>

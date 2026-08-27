@@ -1,79 +1,178 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════
+   DESIGN TOKENS — dark (default)
+═══════════════════════════════════════════════ */
+:root,
+[data-theme="dark"] {
+  --bg:              #0d0d0d;
+  --surface:         #0f0f0f;
+  --card:            #141414;
+  --card-alt:        #1a1a1a;
+  --border:          #222222;
+  --border-subtle:   #1a1a1a;
+  --hover:           #1c1c1c;
+
+  --text-1:          #f0f0f0;
+  --text-2:          #a0a0a0;
+  --text-3:          #555555;
+  --text-4:          #363636;
+
+  --accent:          #4f6ef7;
+  --accent-dim:      #1e2d6b;
+  --accent-hover:    #3a57e0;
+  --accent-text:     #8899ff;
+
+  --success:         #3db97d;
+  --success-bg:      #0d2f1e;
+  --warn:            #d4a017;
+  --warn-bg:         #2d2007;
+  --danger:          #d94040;
+  --danger-bg:       #2d0f0f;
+  --info:            #3d9bd4;
+  --info-bg:         #0d1f2d;
+
+  --input-bg:        #0f0f0f;
+  --input-border:    #252525;
+  --input-focus:     #404040;
+  --select-bg:       #111111;   /* <option> dropdown popup background */
+
+  --scrollbar:       #2a2a2a;
+  --scrollbar-hover: #3a3a3a;
+
+  --sidebar-bg:      #0f0f0f;
+  --topbar-bg:       #0f0f0f;
+  --tbl-head-bg:     #0d0d0d;
+  --tbl-row-border:  #1c1c1c;
+}
+
+/* ═══════════════════════════════════════════════
+   DESIGN TOKENS — light
+═══════════════════════════════════════════════ */
+[data-theme="light"] {
+  --bg:              #f4f5f7;
+  --surface:         #ffffff;
+  --card:            #ffffff;
+  --card-alt:        #f8f9fb;
+  --border:          #e4e6ea;
+  --border-subtle:   #eeeff2;
+  --hover:           #f0f1f4;
+
+  --text-1:          #0f1117;
+  --text-2:          #4a4f5c;
+  --text-3:          #8b91a0;
+  --text-4:          #bcc0ca;
+
+  --accent:          #4f6ef7;
+  --accent-dim:      #dce3fe;
+  --accent-hover:    #3a57e0;
+  --accent-text:     #3a57e0;
+
+  --success:         #1e9e60;
+  --success-bg:      #d4f3e5;
+  --warn:            #b07d0a;
+  --warn-bg:         #fef3d0;
+  --danger:          #c0292f;
+  --danger-bg:       #fde8e8;
+  --info:            #1f7eb8;
+  --info-bg:         #daeefa;
+
+  --input-bg:        #f8f9fb;
+  --input-border:    #dde0e6;
+  --input-focus:     #4f6ef7;
+  --select-bg:       #ffffff;
+
+  --scrollbar:       #d4d6dc;
+  --scrollbar-hover: #b8bbc4;
+
+  --sidebar-bg:      #ffffff;
+  --topbar-bg:       #ffffff;
+  --tbl-head-bg:     #f8f9fb;
+  --tbl-row-border:  #eeeff2;
+}
+
+/* Keep the existing page-level inline colors readable in light mode. */
+[data-theme="light"] [style*="#0d0d0d"],
+[data-theme="light"] [style*="#0f0f0f"],
+[data-theme="light"] [style*="#111111"],
+[data-theme="light"] [style*="#141414"],
+[data-theme="light"] [style*="#161616"],
+[data-theme="light"] [style*="#1a1a1a"] {
+  background: var(--card) !important;
+}
+[data-theme="light"] [style*="#d0d0d0"],
+[data-theme="light"] [style*="#c0c0c0"],
+[data-theme="light"] [style*="#e0e0e0"],
+[data-theme="light"] [style*="#f0f0f0"] {
+  color: var(--text-1) !important;
+}
+[data-theme="light"] [style*="#505050"],
+[data-theme="light"] [style*="#404040"],
+[data-theme="light"] [style*="#383838"],
+[data-theme="light"] [style*="#606060"],
+[data-theme="light"] [style*="#707070"],
+[data-theme="light"] [style*="#808080"],
+[data-theme="light"] [style*="#a0a0a0"] {
+  color: var(--text-2) !important;
+}
+
+/* ═══════════════════════════════════════════════
+   BASE
+═══════════════════════════════════════════════ */
 @layer base {
-  :root {
-    --color-bg:        #0d0d0d;
-    --color-surface:   #141414;
-    --color-card:      #1a1a1a;
-    --color-border:    #262626;
-    --color-hover:     #1f1f1f;
-
-    --color-text-1:    #f0f0f0;
-    --color-text-2:    #a0a0a0;
-    --color-text-3:    #606060;
-
-    --color-accent:    #4f6ef7;
-    --color-accent-dim:#1e2d6b;
-
-    --color-success:   #3db97d;
-    --color-success-bg:#0d2f1e;
-    --color-warn:      #d4a017;
-    --color-warn-bg:   #2d2007;
-    --color-danger:    #d94040;
-    --color-danger-bg: #2d0f0f;
-    --color-info:      #3d9bd4;
-    --color-info-bg:   #0d1f2d;
-  }
-
   * { box-sizing: border-box; }
 
   html, body, #root {
     height: 100%;
-    background: var(--color-bg);
-    color: var(--color-text-1);
+    background: var(--bg);
+    color: var(--text-1);
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 13px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    transition: background 0.2s, color 0.2s;
   }
 
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
-  /* ── Remove ALL focus outlines from Recharts SVG elements ── */
-  .recharts-wrapper,
-  .recharts-wrapper *,
-  .recharts-surface,
-  .recharts-layer,
-  svg,
-  path,
-  rect,
-  circle,
-  ellipse,
-  line,
-  polyline,
-  polygon {
+  /* ── Recharts: remove all focus outlines on click ── */
+  .recharts-wrapper, .recharts-wrapper *,
+  .recharts-surface, .recharts-layer,
+  svg, path, rect, circle, ellipse, line, polyline, polygon {
     outline: none !important;
     -webkit-tap-highlight-color: transparent;
   }
-
-  /* Remove the sector stroke that shows as a white border on pie slices */
-  .recharts-sector:focus,
-  .recharts-sector:active {
+  .recharts-sector:focus, .recharts-sector:active {
     outline: none !important;
     stroke: none !important;
   }
+
+  /* ── Native <select> dropdown popup — themed ── */
+  select option {
+    background: var(--select-bg);
+    color: var(--text-1);
+  }
+
+  select { color-scheme: dark; }
+  [data-theme="light"] select { color-scheme: light; }
 }
 
-/* ── REUSABLE PRIMITIVES ── */
+/* ═══════════════════════════════════════════════
+   COMPONENT CLASSES
+═══════════════════════════════════════════════ */
+
+/* Card */
 .card {
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 10px;
+  transition: background 0.2s, border-color 0.2s;
 }
 
+/* Badge */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -84,57 +183,63 @@
   font-weight: 600;
   letter-spacing: 0.03em;
 }
-.badge-success { background: var(--color-success-bg); color: var(--color-success); }
-.badge-warn    { background: var(--color-warn-bg);    color: var(--color-warn);    }
-.badge-danger  { background: var(--color-danger-bg);  color: var(--color-danger);  }
-.badge-info    { background: var(--color-info-bg);    color: var(--color-info);    }
-.badge-neutral { background: #1e1e1e; color: #808080; }
-.badge-accent  { background: var(--color-accent-dim); color: var(--color-accent);  }
+.badge-success { background: var(--success-bg); color: var(--success); }
+.badge-warn    { background: var(--warn-bg);    color: var(--warn);    }
+.badge-danger  { background: var(--danger-bg);  color: var(--danger);  }
+.badge-info    { background: var(--info-bg);    color: var(--info);    }
+.badge-neutral { background: var(--card-alt);   color: var(--text-2);  }
+.badge-accent  { background: var(--accent-dim); color: var(--accent);  }
 
+/* Progress track */
 .prog-track {
-  background: #252525;
+  background: var(--border);
   border-radius: 99px;
   overflow: hidden;
 }
 
+/* Table head */
 .tbl-head th {
-  background: #111111;
-  color: var(--color-text-3);
+  background: var(--tbl-head-bg);
+  color: var(--text-3);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
+/* Table body */
 .tbl-body td {
   padding: 11px 14px;
-  border-bottom: 1px solid #1c1c1c;
+  border-bottom: 1px solid var(--tbl-row-border);
   font-size: 12px;
-  color: var(--color-text-2);
+  color: var(--text-2);
   vertical-align: middle;
+  transition: background 0.1s;
 }
-
 .tbl-body tr:last-child td { border-bottom: none; }
-.tbl-body tr:hover td { background: var(--color-hover); }
+.tbl-body tr:hover td { background: var(--hover); }
 
+/* Input / Select */
 .input-dark {
-  background: #111111;
-  border: 1px solid var(--color-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 7px;
-  color: var(--color-text-1);
+  color: var(--text-1);
   font-size: 12px;
   padding: 7px 12px;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background 0.2s;
+  appearance: auto;
 }
-.input-dark:focus { border-color: #404040; }
-.input-dark::placeholder { color: var(--color-text-3); }
+.input-dark:focus { border-color: var(--input-focus); }
+.input-dark::placeholder { color: var(--text-3); }
 
+/* Buttons */
 .btn-accent {
-  background: var(--color-accent);
+  background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 7px;
@@ -151,9 +256,9 @@
 
 .btn-ghost {
   background: transparent;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: 7px;
-  color: var(--color-text-2);
+  color: var(--text-2);
   font-size: 12px;
   font-weight: 500;
   padding: 7px 14px;
@@ -163,4 +268,4 @@
   gap: 6px;
   transition: background 0.15s, color 0.15s;
 }
-.btn-ghost:hover { background: var(--color-hover); color: var(--color-text-1); }
+.btn-ghost:hover { background: var(--hover); color: var(--text-1); }
