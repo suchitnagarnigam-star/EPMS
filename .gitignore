@@ -9,14 +9,39 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+dist-ssr/
+build/
+
 # Environment variables
 .env
 .env.local
+.env.*.local
 
 # IDE configurations
-.vscode/
+.vscode/settings.json
 .idea/
 
 # OS files
 .DS_Store
 Thumbs.db
+*.suo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.ntvs*
+*.njsproj
+*.sln
+
+# TypeScript cache
+*.tsbuildinfo
+>>>>>>> ab83adaa3b29e718384f5c200819e53e81002b5b
