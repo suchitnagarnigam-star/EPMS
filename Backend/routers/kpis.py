@@ -39,12 +39,13 @@ async def get_kpis(branch: Optional[str] = None, conn: Connection = Depends(get_
     )
     by_branch = {row['branch']: row['count'] for row in branch_rows}
 
-    # 3. Fetch by_delivery_status distribution
+    # 3. Fetch by_delivery_status — canonical values only
     status_rows = await conn.fetch(
         """
-        SELECT COALESCE(delivery_status, 'Unspecified') as status, COUNT(*)::integer AS count
+        SELECT delivery_status as status, COUNT(*)::integer AS count
         FROM fact_works
         WHERE ($1::varchar IS NULL OR branch = $1)
+          AND delivery_status IN ('In Progress','Delayed/Held Up','Completed','Not Started','Procurement')
         GROUP BY delivery_status
         """,
         branch
@@ -57,12 +58,13 @@ async def get_kpis(branch: Optional[str] = None, conn: Connection = Depends(get_
         if s not in by_delivery_status:
             by_delivery_status[s] = 0
 
-    # 4. Fetch by_workflow_stage distribution
+    # 4. Fetch by_workflow_stage — canonical values only
     stage_rows = await conn.fetch(
         """
-        SELECT COALESCE(workflow_stage, 'Unspecified') as stage, COUNT(*)::integer AS count
+        SELECT workflow_stage as stage, COUNT(*)::integer AS count
         FROM fact_works
         WHERE ($1::varchar IS NULL OR branch = $1)
+          AND workflow_stage IN ('Awarded','Work Order Issued','Procurement','Approval Pending','In Progress','Completed','Not Started','Delayed/Held Up')
         GROUP BY workflow_stage
         """,
         branch
