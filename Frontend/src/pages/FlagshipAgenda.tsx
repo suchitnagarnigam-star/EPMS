@@ -1,9 +1,25 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  type BarShapeProps,
+} from 'recharts';
 import { flagshipMDF, flagshipSASCI } from '../data/mockData';
 import ProgressBar from '../components/ProgressBar';
 import type { FlagshipWork } from '../data/types';
+
+// Factory that returns a brightened active-bar render function accepted by Recharts
+function makeBrightBar(overrideFill?: string) {
+  return function ActiveBar(props: BarShapeProps) {
+    const { x = 0, y = 0, width = 0, height = 0, fill = '#4f6ef7' } = props;
+    const useFill = overrideFill ?? String(fill);
+    return (
+      <rect x={x} y={y} width={Number(width)} height={Math.max(0, Number(height))}
+            fill={useFill} rx={2} ry={2}
+            style={{ filter: 'brightness(1.35)' }} />
+    );
+  };
+}
 
 const TOOLTIP_STYLE = {
   background: '#1a1a1a', border: '1px solid #2a2a2a',
@@ -131,11 +147,12 @@ export default function FlagshipAgenda() {
           <BarChart data={chartData} barGap={1} barSize={9}>
             <XAxis dataKey="name" tick={{ fill: '#404040', fontSize: 9 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#1e1e1e' }} />
-            <Bar dataKey="physical" name="Physical %" radius={[2,2,0,0]}>
-              {chartData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
+            <Bar dataKey="physical" name="Physical %" radius={[2,2,0,0]} activeBar={makeBrightBar()}>
+              {chartData.map((d, i) => <Cell key={i} fill={d.fill} stroke="none" />)}
             </Bar>
-            <Bar dataKey="financial" name="Financial %" fill="#3d9bd4" radius={[2,2,0,0]} />
+            <Bar dataKey="financial" name="Financial %" fill="#3d9bd4" radius={[2,2,0,0]}
+                 activeBar={makeBrightBar('#60b8e8')} />
           </BarChart>
         </ResponsiveContainer>
       </div>

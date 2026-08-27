@@ -1,9 +1,25 @@
 import { useState } from 'react';
 import { Download, TrendingUp, TrendingDown, AlertTriangle, Clock } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  type BarShapeProps,
+} from 'recharts';
 import { contractors } from '../data/mockData';
 import ProgressBar from '../components/ProgressBar';
 import type { AgencyHealth } from '../data/types';
+
+// Factory that returns a brightened active-bar render function accepted by Recharts
+function makeBrightBar(overrideFill?: string) {
+  return function ActiveBar(props: BarShapeProps) {
+    const { x = 0, y = 0, width = 0, height = 0, fill = '#4f6ef7' } = props;
+    const useFill = overrideFill ?? String(fill);
+    return (
+      <rect x={x} y={y} width={Number(width)} height={Math.max(0, Number(height))}
+            fill={useFill} rx={3} ry={3}
+            style={{ filter: 'brightness(1.35)' }} />
+    );
+  };
+}
 
 const TOOLTIP_STYLE = {
   background: '#1a1a1a', border: '1px solid #2a2a2a',
@@ -73,9 +89,9 @@ export default function ContractorMatrix() {
           <BarChart data={chartData} barSize={20}>
             <XAxis dataKey="name" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#1e1e1e' }} />
-            <Bar dataKey="progress" name="Avg Progress %" radius={[3,3,0,0]}>
-              {chartData.map((d, i) => <Cell key={i} fill={d.color} />)}
+            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
+            <Bar dataKey="progress" name="Avg Progress %" radius={[3,3,0,0]} activeBar={makeBrightBar()}>
+              {chartData.map((d, i) => <Cell key={i} fill={d.color} stroke="none" />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

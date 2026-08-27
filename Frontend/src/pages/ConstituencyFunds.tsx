@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  PieChart, Pie, Legend, Sector,
+  type PieSectorDataItem, type BarShapeProps,
+} from 'recharts';
 import { constituencies } from '../data/mockData';
 import ProgressBar from '../components/ProgressBar';
 
@@ -10,6 +14,35 @@ const TOOLTIP_STYLE = {
 };
 
 const COLORS = ['#4f6ef7','#3d9bd4','#3db97d','#d4a017','#d94040','#8b5cf6'];
+
+// Factory that returns a brightened active-bar render function accepted by Recharts
+function makeBrightBar(overrideFill?: string) {
+  return function ActiveBar(props: BarShapeProps) {
+    const { x = 0, y = 0, width = 0, height = 0, fill = '#4f6ef7' } = props;
+    const useFill = overrideFill ?? String(fill);
+    return (
+      <rect x={x} y={y} width={Number(width)} height={Math.max(0, Number(height))}
+            fill={useFill} rx={3} ry={3}
+            style={{ filter: 'brightness(1.35)' }} />
+    );
+  };
+}
+
+// Clean active pie shape — expands slice slightly, no outline/stroke
+function ActivePieShape(props: PieSectorDataItem) {
+  const {
+    cx = 0, cy = 0, innerRadius = 0, outerRadius = 0,
+    startAngle = 0, endAngle = 0, fill = '#fff',
+  } = props;
+  return (
+    <Sector cx={cx} cy={cy}
+            innerRadius={innerRadius}
+            outerRadius={Number(outerRadius) + 6}
+            startAngle={startAngle} endAngle={endAngle}
+            fill={fill} stroke="none"
+            style={{ outline: 'none', filter: 'brightness(1.18)' }} />
+  );
+}
 
 export default function ConstituencyFunds() {
   const [search, setSearch] = useState('');
@@ -66,8 +99,16 @@ export default function ConstituencyFunds() {
           <p className="text-[11px] mb-3" style={{ color: '#505050' }}>Sanctioned estimate cost distribution (₹ Lacs)</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" strokeWidth={0}>
-                {pieData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+              <Pie
+                data={pieData}
+                cx="50%" cy="50%"
+                innerRadius={50} outerRadius={80}
+                dataKey="value"
+                strokeWidth={0}
+                stroke="none"
+                activeShape={ActivePieShape}
+              >
+                {pieData.map((d, i) => <Cell key={i} fill={d.fill} stroke="none" />)}
               </Pie>
               <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`₹${Number(v).toLocaleString()} L`, '']} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#606060' }} />
@@ -82,10 +123,12 @@ export default function ConstituencyFunds() {
             <BarChart data={utilData} barGap={3} barSize={14}>
               <XAxis dataKey="name" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#1e1e1e' }}
+              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }}
                        formatter={(v) => [`₹${Number(v)} Cr`, '']} />
-              <Bar dataKey="sanctioned" name="Sanctioned (₹ Cr)" fill="#4f6ef7" radius={[3,3,0,0]} />
-              <Bar dataKey="spent"      name="Expenditure (₹ Cr)" fill="#3db97d" radius={[3,3,0,0]} />
+              <Bar dataKey="sanctioned" name="Sanctioned (₹ Cr)" fill="#4f6ef7" radius={[3,3,0,0]}
+                   activeBar={makeBrightBar('#7b93ff')} />
+              <Bar dataKey="spent" name="Expenditure (₹ Cr)" fill="#3db97d" radius={[3,3,0,0]}
+                   activeBar={makeBrightBar('#5ed4a0')} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -2,13 +2,43 @@ import { useState } from 'react';
 import { Download, Filter } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  Cell, PieChart, Pie, Legend,
+  Cell, PieChart, Pie, Legend, Sector, type PieSectorDataItem,
+  type BarShapeProps,
 } from 'recharts';
 import StatCard from '../components/StatCard';
 import StageBadge from '../components/StageBadge';
 import RiskBadge from '../components/RiskBadge';
 import ProgressBar from '../components/ProgressBar';
 import { kpiSummary, works, stageDistribution, zoneProgress, monthlySpend } from '../data/mockData';
+
+// Factory that returns a brightened active-bar render function accepted by Recharts
+function makeBrightBar(overrideFill?: string) {
+  return function ActiveBar(props: BarShapeProps) {
+    const { x = 0, y = 0, width = 0, height = 0, fill = '#4f6ef7' } = props;
+    const useFill = overrideFill ?? String(fill);
+    return (
+      <rect x={x} y={y} width={Number(width)} height={Math.max(0, Number(height))}
+            fill={useFill} rx={3} ry={3}
+            style={{ filter: 'brightness(1.35)' }} />
+    );
+  };
+}
+
+// Active pie sector — expands slightly, no white ring
+function ActivePieShape(props: PieSectorDataItem) {
+  const {
+    cx = 0, cy = 0, innerRadius = 0, outerRadius = 0,
+    startAngle = 0, endAngle = 0, fill = '#fff',
+  } = props;
+  return (
+    <Sector cx={cx} cy={cy}
+            innerRadius={innerRadius}
+            outerRadius={Number(outerRadius) + 6}
+            startAngle={startAngle} endAngle={endAngle}
+            fill={fill} stroke="none"
+            style={{ outline: 'none', filter: 'brightness(1.18)' }} />
+  );
+}
 
 const TOOLTIP_STYLE = {
   background: '#1a1a1a', border: '1px solid #2a2a2a',
@@ -58,9 +88,16 @@ export default function ExecutiveOverview() {
           <p className="text-[11px]" style={{ color: '#505050' }}>Current portfolio distribution — 1,158 works</p>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
-              <Pie data={stageDistribution} cx="50%" cy="50%" innerRadius={55} outerRadius={80}
-                   dataKey="value" strokeWidth={0}>
-                {stageDistribution.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+              <Pie
+                data={stageDistribution}
+                cx="50%" cy="50%"
+                innerRadius={55} outerRadius={80}
+                dataKey="value"
+                strokeWidth={0}
+                stroke="none"
+                activeShape={ActivePieShape}
+              >
+                {stageDistribution.map((entry, i) => <Cell key={i} fill={entry.fill} stroke="none" />)}
               </Pie>
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#606060' }} />
@@ -76,14 +113,16 @@ export default function ExecutiveOverview() {
             <BarChart data={zoneProgress} barGap={2} barSize={10}>
               <XAxis dataKey="zone" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#1e1e1e' }} />
-              <Bar dataKey="BR"  fill="#4f6ef7" radius={[3,3,0,0]} name="B&R"  />
-              <Bar dataKey="OM"  fill="#3d9bd4" radius={[3,3,0,0]} name="O&M" />
+              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
+              <Bar dataKey="BR" fill="#4f6ef7" radius={[3,3,0,0]} name="B&R"
+                   activeBar={makeBrightBar('#7b93ff')} />
+              <Bar dataKey="OM" fill="#3d9bd4" radius={[3,3,0,0]} name="O&M"
+                   activeBar={makeBrightBar('#60b8e8')} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Monthly Spend Area */}
+        {/* Monthly Spend */}
         <div className="card p-5 flex flex-col gap-3">
           <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Monthly Disbursements (₹ Cr)</h3>
           <p className="text-[11px]" style={{ color: '#505050' }}>FY 2023–24 payment trend</p>
@@ -91,10 +130,10 @@ export default function ExecutiveOverview() {
             <BarChart data={monthlySpend} barSize={14}>
               <XAxis dataKey="month" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#1e1e1e' }} />
-              <Bar dataKey="spend" name="₹ Cr" radius={[3,3,0,0]}>
+              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
+              <Bar dataKey="spend" name="₹ Cr" radius={[3,3,0,0]} activeBar={makeBrightBar()}>
                 {monthlySpend.map((_, i) => (
-                  <Cell key={i} fill={i === monthlySpend.length - 1 ? '#d4a017' : '#4f6ef7'} />
+                  <Cell key={i} fill={i === monthlySpend.length - 1 ? '#d4a017' : '#4f6ef7'} stroke="none" />
                 ))}
               </Bar>
             </BarChart>
