@@ -19,7 +19,7 @@ async def get_kpis(branch: Optional[str] = None, conn: Connection = Depends(get_
             COALESCE(SUM(est_cost_lacs), 0)::float AS total_est_cost_lacs,
             COALESCE(SUM(tender_cost_lacs), 0)::float AS total_tender_cost_lacs,
             COALESCE(SUM(expenditure_lacs), 0)::float AS total_expenditure_lacs,
-            COALESCE(AVG(financial_progress_pct), 0)::float AS avg_financial_progress_pct,
+            COALESCE(AVG(CASE WHEN financial_progress_pct <= 100 THEN financial_progress_pct END), 0)::float AS avg_financial_progress_pct,
             COUNT(CASE WHEN fin_progress_anomaly = TRUE THEN 1 END)::integer AS anomaly_count
         FROM fact_works
         WHERE ($1::varchar IS NULL OR branch = $1)
