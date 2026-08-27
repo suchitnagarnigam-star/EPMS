@@ -115,7 +115,7 @@ class WorkSyncItem(BaseModel):
 
     # Timeline
     start_date: Optional[date] = None
-    time_limit_months: Optional[int] = None
+    time_limit_months: Optional[float] = None
     scheduled_end_date: Optional[date] = None
     actual_completion_date: Optional[date] = None
 
@@ -147,7 +147,7 @@ class WorkSyncItem(BaseModel):
     def validate_datetime(cls, v: Any) -> Optional[datetime]:
         return parse_datetime_safe(v)
 
-    @field_validator('ward', 'zone', mode='before')
+    @field_validator('ward', 'zone', 'delivery_status', 'workflow_stage', mode='before')
     @classmethod
     def coerce_to_str(cls, v: Any) -> Optional[str]:
         if v is None:
@@ -169,7 +169,7 @@ class QualitySyncItem(BaseModel):
     def validate_datetime(cls, v: Any) -> Optional[datetime]:
         return parse_datetime_safe(v)
 
-    @field_validator('raw_ward', 'raw_zone', mode='before')
+    @field_validator('raw_ward', 'raw_zone', 'raw_status', mode='before')
     @classmethod
     def coerce_to_str(cls, v: Any) -> Optional[str]:
         if v is None:
