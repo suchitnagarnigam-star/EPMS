@@ -2,10 +2,11 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, MapPin,
   Star, Bell, Search, ChevronDown, Activity, LogOut,
-  Sun, Moon,
+  Sun, Moon, ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { SyncStatus } from './SyncStatus';
 
 const NAV_ITEMS = [
   { to: '/',               icon: LayoutDashboard, label: 'Executive Overview'     },
@@ -13,6 +14,7 @@ const NAV_ITEMS = [
   { to: '/constituencies', icon: MapPin,          label: 'Constituencies & Wards' },
   { to: '/works',          icon: ClipboardList,   label: 'Works Directory'        },
   { to: '/flagship',       icon: Star,            label: 'MDF & SASCI Agenda'     },
+  { to: '/quality',        icon: ShieldAlert,     label: 'Data Quality'           },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
@@ -21,6 +23,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/constituencies': 'Constituency & Ward Funds',
   '/works':          'Master Works Directory',
   '/flagship':       'MDF & SASCI Special Agenda',
+  '/quality':        'Data Quality Dashboard',
 };
 
 export default function Layout() {
@@ -114,11 +117,10 @@ export default function Layout() {
 
         {/* Sidebar footer */}
         <div
-          className="px-4 py-3 flex items-center gap-2"
+          className="px-4 py-3 flex flex-col gap-1"
           style={{ borderTop: '1px solid var(--border)', color: 'var(--text-4)' }}
         >
-          <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--success)' }} />
-          <span className="text-[10px]">Live · 26 Aug 2026</span>
+          <SyncStatus />
         </div>
       </aside>
 
@@ -156,6 +158,9 @@ export default function Layout() {
             <span className="text-[11px] font-medium hidden md:block" style={{ color: 'var(--text-4)' }}>
               {title}
             </span>
+            <div className="hidden lg:block">
+              <SyncStatus />
+            </div>
 
             {/* Theme toggle */}
             <button
