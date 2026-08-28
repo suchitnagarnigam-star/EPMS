@@ -309,3 +309,15 @@ async def sync_sheets(payload: SyncPayload, conn: Connection = Depends(get_db)):
         quality_inserted=quality_inserted_count,
         errors=errors
     )
+
+@router.get("/status")
+async def get_sync_status(conn: Connection = Depends(get_db)):
+    row = await conn.fetchrow("""
+        SELECT MAX(updated_at) AS last_synced_at,
+               COUNT(*)::integer AS total_works
+        FROM fact_works
+    """)
+    return {
+        "last_synced_at": row["last_synced_at"].isoformat() if row["last_synced_at"] else None,
+        "total_works": row["total_works"]
+    }
