@@ -1,21 +1,22 @@
 import { useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie, Legend, Sector,
   type PieSectorDataItem, type BarShapeProps,
 } from 'recharts';
-import { constituencies } from '../data/mockData';
 import ProgressBar from '../components/ProgressBar';
+import { useApi } from '../data/useApi';
+import { fetchConstituencies } from '../data/api';
+import type { ConstituencyRecord } from '../data/api';
 
 const TOOLTIP_STYLE = {
   background: '#1a1a1a', border: '1px solid #2a2a2a',
   borderRadius: 8, fontSize: 11, color: '#d0d0d0',
 };
 
-const COLORS = ['#4f6ef7','#3d9bd4','#3db97d','#d4a017','#d94040','#8b5cf6'];
+const COLORS = ['#4f6ef7','#3d9bd4','#3db97d','#d4a017','#d94040','#8b5cf6','#606060','#e879f9','#f97316'];
 
-// Factory that returns a brightened active-bar render function accepted by Recharts
 function makeBrightBar(overrideFill?: string) {
   return function ActiveBar(props: BarShapeProps) {
     const { x = 0, y = 0, width = 0, height = 0, fill = '#4f6ef7' } = props;
@@ -28,7 +29,6 @@ function makeBrightBar(overrideFill?: string) {
   };
 }
 
-// Clean active pie shape — expands slice slightly, no outline/stroke
 function ActivePieShape(props: PieSectorDataItem) {
   const {
     cx = 0, cy = 0, innerRadius = 0, outerRadius = 0,
@@ -44,45 +44,69 @@ function ActivePieShape(props: PieSectorDataItem) {
   );
 }
 
+function LoadingSkeleton({ height = 200, label = 'Loading...' }: { height?: number; label?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2" style={{ height, color: '#505050' }}>
+      <Loader2 size={20} className="animate-spin" />
+      <span className="text-[11px]">{label}</span>
+    </div>
+  );
+}
+
 export default function ConstituencyFunds() {
   const [search, setSearch] = useState('');
+  const [branch, setBranch] = useState('All');
 
-  const totals = {
-    works:       constituencies.reduce((a, c) => a + c.totalWorks, 0),
-    sanctioned:  constituencies.reduce((a, c) => a + c.sanctionedCost, 0),
-    tender:      constituencies.reduce((a, c) => a + c.tenderValue, 0),
-    expenditure: constituencies.reduce((a, c) => a + c.expenditure, 0),
-    critical:    constituencies.reduce((a, c) => a + c.criticalCount, 0),
-  };
+  const apiBranch = branch === 'All' ? undefined : branch;
 
-  const filtered = constituencies.filter(c =>
-    search === '' || c.name.toLowerCase().includes(search.toLowerCase())
+  const { data: constituencies, loading, error } = useApi<ConstituencyRecord[]>(
+    () => fetchConstituencies(apiBranch), [apiBranch]
   );
 
-  const pieData = constituencies.map((c, i) => ({
-    name: c.name.replace('Ludhiana ', ''),
-    value: c.sanctionedCost,
-    fill: COLORS[i],
+  const list = constituencies || [];
+
+  const totals = {
+    works:       list.reduce((a, c) => a + c.total_works, 0),
+    sanctioned:  list.reduce((a, c) => a + c.total_est_cost_lacs, 0),
+    tender:      list.reduce((a, c) => a + c.total_tender_cost_lacs, 0),
+    expenditure: list.reduce((a, c) => a + c.total_expenditure_lacs, 0),
+    critical:    list.reduce((a, c) => a + c.critical_count, 0),
+  };
+
+  const filtered = list.filter(c =>
+    search === '' || c.constituency.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const pieData = list.map((c, i) => ({
+    name: c.constituency,
+    value: c.total_est_cost_lacs,
+    fill: COLORS[i % COLORS.length],
   }));
 
-  const utilData = constituencies.map((c, i) => ({
-    name: c.name.replace('Ludhiana ', ''),
-    sanctioned: Math.round(c.sanctionedCost / 100),
-    spent:      Math.round(c.expenditure / 100),
-    color:      COLORS[i],
+  const utilData = list.map((c, i) => ({
+    name: c.constituency.length > 12 ? c.constituency.substring(0, 12) + '…' : c.constituency,
+    sanctioned: Math.round(c.total_est_cost_lacs / 100),
+    spent:      Math.round(c.total_expenditure_lacs / 100),
+    color:      COLORS[i % COLORS.length],
   }));
 
   return (
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
 
+      {error && (
+        <div className="card p-4 text-[12px]" style={{ color: '#d94040', borderColor: '#d94040' }}>
+          ⚠ {error}
+        </div>
+      )}
+
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: 'Total Works',         value: totals.works.toLocaleString(),                  accent: '#4f6ef7'  },
-          { label: 'Sanctioned Cost',     value: `₹${(totals.sanctioned/100).toFixed(0)} Cr`,    accent: '#3d9bd4'  },
-          { label: 'Allotted Tender',     value: `₹${(totals.tender/100).toFixed(0)} Cr`,        accent: '#4f6ef7'  },
-          { label: 'Expenditure Paid',    value: `₹${(totals.expenditure/100).toFixed(0)} Cr`,   accent: '#3db97d'  },
-          { label: 'Critical Works',      value: String(totals.critical),                         accent: '#d94040'  },
+          { label: 'Total Works',         value: loading ? '—' : totals.works.toLocaleString(),                  accent: '#4f6ef7'  },
+          { label: 'Sanctioned Cost',     value: loading ? '—' : `₹${(totals.sanctioned/100).toFixed(0)} Cr`,    accent: '#3d9bd4'  },
+          { label: 'Allotted Tender',     value: loading ? '—' : `₹${(totals.tender/100).toFixed(0)} Cr`,        accent: '#4f6ef7'  },
+          { label: 'Expenditure Paid',    value: loading ? '—' : `₹${(totals.expenditure/100).toFixed(0)} Cr`,   accent: '#3db97d'  },
+          { label: 'Critical Works',      value: loading ? '—' : String(totals.critical),                         accent: '#d94040'  },
         ].map(k => (
           <div key={k.label} className="card p-4">
             <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#505050' }}>{k.label}</p>
@@ -93,44 +117,51 @@ export default function ConstituencyFunds() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
         <div className="card p-5">
           <h3 className="text-[13px] font-semibold mb-1" style={{ color: '#d0d0d0' }}>Budget Allocation by Constituency</h3>
           <p className="text-[11px] mb-3" style={{ color: '#505050' }}>Sanctioned estimate cost distribution (₹ Lacs)</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie
-                data={pieData}
-                cx="50%" cy="50%"
-                innerRadius={50} outerRadius={80}
-                dataKey="value"
-                strokeWidth={0}
-                stroke="none"
-                activeShape={ActivePieShape}
-              >
-                {pieData.map((d, i) => <Cell key={i} fill={d.fill} stroke="none" />)}
-              </Pie>
-              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`₹${Number(v).toLocaleString()} L`, '']} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#606060' }} />
-            </PieChart>
-          </ResponsiveContainer>
+          {loading ? (
+            <LoadingSkeleton />
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%" cy="50%"
+                  innerRadius={50} outerRadius={80}
+                  dataKey="value"
+                  strokeWidth={0}
+                  stroke="none"
+                  activeShape={ActivePieShape}
+                >
+                  {pieData.map((d, i) => <Cell key={i} fill={d.fill} stroke="none" />)}
+                </Pie>
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`₹${Number(v).toLocaleString()} L`, '']} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#606060' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         <div className="card p-5">
           <h3 className="text-[13px] font-semibold mb-1" style={{ color: '#d0d0d0' }}>Sanctioned vs Expenditure (₹ Cr)</h3>
           <p className="text-[11px] mb-3" style={{ color: '#505050' }}>Budget utilization comparison per constituency</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={utilData} barGap={3} barSize={14}>
-              <XAxis dataKey="name" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }}
-                       formatter={(v) => [`₹${Number(v)} Cr`, '']} />
-              <Bar dataKey="sanctioned" name="Sanctioned (₹ Cr)" fill="#4f6ef7" radius={[3,3,0,0]}
-                   activeBar={makeBrightBar('#7b93ff')} />
-              <Bar dataKey="spent" name="Expenditure (₹ Cr)" fill="#3db97d" radius={[3,3,0,0]}
-                   activeBar={makeBrightBar('#5ed4a0')} />
-            </BarChart>
-          </ResponsiveContainer>
+          {loading ? (
+            <LoadingSkeleton />
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={utilData} barGap={3} barSize={14}>
+                <XAxis dataKey="name" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }}
+                         formatter={(v) => [`₹${Number(v)} Cr`, '']} />
+                <Bar dataKey="sanctioned" name="Sanctioned (₹ Cr)" fill="#4f6ef7" radius={[3,3,0,0]}
+                     activeBar={makeBrightBar('#7b93ff')} />
+                <Bar dataKey="spent" name="Expenditure (₹ Cr)" fill="#3db97d" radius={[3,3,0,0]}
+                     activeBar={makeBrightBar('#5ed4a0')} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -140,6 +171,15 @@ export default function ConstituencyFunds() {
              style={{ borderBottom: '1px solid #1f1f1f', background: '#111111' }}>
           <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Constituency-wise Fund Statement</h3>
           <div className="flex items-center gap-2">
+            <select
+              className="input-dark py-1.5 text-[11px]"
+              value={branch}
+              onChange={e => setBranch(e.target.value)}
+            >
+              <option value="All">All Branches</option>
+              <option value="B&R">B&R Branch</option>
+              <option value="O&M">O&M Branch</option>
+            </select>
             <input className="input-dark py-1.5 text-[11px]" style={{ width: 200 }}
                    placeholder="Search constituency..." value={search} onChange={e => setSearch(e.target.value)} />
             <button className="btn-ghost py-1.5 text-[11px]"><Download size={12} /> Export</button>
@@ -147,64 +187,72 @@ export default function ConstituencyFunds() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full" style={{ minWidth: 820 }}>
-            <thead className="tbl-head">
-              <tr>
-                <th>Assembly Constituency</th>
-                <th className="text-right">Total Works</th>
-                <th className="text-right">B&amp;R Works</th>
-                <th className="text-right">O&amp;M Works</th>
-                <th className="text-right">Sanctioned (₹ Lacs)</th>
-                <th className="text-right">Tender Value (₹ Lacs)</th>
-                <th className="text-right">Expenditure (₹ Lacs)</th>
-                <th className="text-right">Critical</th>
-                <th style={{ minWidth: 160 }}>Utilization %</th>
-              </tr>
-            </thead>
-            <tbody className="tbl-body">
-              {filtered.map((c, i) => {
-                const util = Math.round((c.expenditure / c.sanctionedCost) * 100);
-                return (
-                  <tr key={c.name}>
+          {loading ? (
+            <LoadingSkeleton height={300} label="Loading constituency data..." />
+          ) : (
+            <table className="w-full" style={{ minWidth: 820 }}>
+              <thead className="tbl-head">
+                <tr>
+                  <th>Constituency</th>
+                  <th className="text-right">Total Works</th>
+                  <th className="text-right">B&amp;R Works</th>
+                  <th className="text-right">O&amp;M Works</th>
+                  <th className="text-right">Sanctioned (₹ Lacs)</th>
+                  <th className="text-right">Tender Value (₹ Lacs)</th>
+                  <th className="text-right">Expenditure (₹ Lacs)</th>
+                  <th className="text-right">Critical</th>
+                  <th style={{ minWidth: 160 }}>Utilization %</th>
+                </tr>
+              </thead>
+              <tbody className="tbl-body">
+                {filtered.map((c, i) => {
+                  const util = c.total_est_cost_lacs > 0
+                    ? Math.round((c.total_expenditure_lacs / c.total_est_cost_lacs) * 100)
+                    : 0;
+                  return (
+                    <tr key={c.constituency}>
+                      <td>
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                          <span className="font-semibold" style={{ color: '#c0c0c0' }}>{c.constituency}</span>
+                        </div>
+                      </td>
+                      <td className="text-right font-semibold" style={{ color: '#d0d0d0' }}>{c.total_works}</td>
+                      <td className="text-right">{c.br_works}</td>
+                      <td className="text-right">{c.om_works}</td>
+                      <td className="text-right font-medium" style={{ color: '#d0d0d0' }}>₹{c.total_est_cost_lacs.toLocaleString()}</td>
+                      <td className="text-right">₹{c.total_tender_cost_lacs.toLocaleString()}</td>
+                      <td className="text-right" style={{ color: '#3db97d' }}>₹{c.total_expenditure_lacs.toLocaleString()}</td>
+                      <td className="text-right" style={{ color: c.critical_count > 5 ? '#d94040' : '#808080' }}>
+                        {c.critical_count}
+                      </td>
+                      <td><ProgressBar value={util} showLabel /></td>
+                    </tr>
+                  );
+                })}
+                {/* Total row */}
+                {filtered.length > 0 && (
+                  <tr style={{ background: '#131313', borderTop: '1px solid #252525' }}>
+                    <td className="font-bold" style={{ color: '#d0d0d0' }}>Total (All Constituencies)</td>
+                    <td className="text-right font-bold" style={{ color: '#d0d0d0' }}>{totals.works}</td>
+                    <td className="text-right font-bold" style={{ color: '#d0d0d0' }}>
+                      {list.reduce((a, c) => a + c.br_works, 0)}
+                    </td>
+                    <td className="text-right font-bold" style={{ color: '#d0d0d0' }}>
+                      {list.reduce((a, c) => a + c.om_works, 0)}
+                    </td>
+                    <td className="text-right font-bold" style={{ color: '#4f6ef7' }}>₹{totals.sanctioned.toLocaleString()}</td>
+                    <td className="text-right font-bold" style={{ color: '#d0d0d0' }}>₹{totals.tender.toLocaleString()}</td>
+                    <td className="text-right font-bold" style={{ color: '#3db97d' }}>₹{totals.expenditure.toLocaleString()}</td>
+                    <td className="text-right font-bold" style={{ color: '#d94040' }}>{totals.critical}</td>
                     <td>
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: COLORS[i] }} />
-                        <span className="font-semibold" style={{ color: '#c0c0c0' }}>{c.name}</span>
-                      </div>
+                      <ProgressBar value={totals.sanctioned > 0 ? Math.round((totals.expenditure / totals.sanctioned) * 100) : 0} showLabel />
                     </td>
-                    <td className="text-right font-semibold" style={{ color: '#d0d0d0' }}>{c.totalWorks}</td>
-                    <td className="text-right">{c.brWorks}</td>
-                    <td className="text-right">{c.omWorks}</td>
-                    <td className="text-right font-medium" style={{ color: '#d0d0d0' }}>₹{c.sanctionedCost.toLocaleString()}</td>
-                    <td className="text-right">₹{c.tenderValue.toLocaleString()}</td>
-                    <td className="text-right" style={{ color: '#3db97d' }}>₹{c.expenditure.toLocaleString()}</td>
-                    <td className="text-right" style={{ color: c.criticalCount > 5 ? '#d94040' : '#808080' }}>
-                      {c.criticalCount}
-                    </td>
-                    <td><ProgressBar value={util} showLabel /></td>
                   </tr>
-                );
-              })}
-              {/* Total row */}
-              <tr style={{ background: '#131313', borderTop: '1px solid #252525' }}>
-                <td className="font-bold" style={{ color: '#d0d0d0' }}>Total (All Constituencies)</td>
-                <td className="text-right font-bold" style={{ color: '#d0d0d0' }}>{totals.works}</td>
-                <td className="text-right font-bold" style={{ color: '#d0d0d0' }}>
-                  {constituencies.reduce((a, c) => a + c.brWorks, 0)}
-                </td>
-                <td className="text-right font-bold" style={{ color: '#d0d0d0' }}>
-                  {constituencies.reduce((a, c) => a + c.omWorks, 0)}
-                </td>
-                <td className="text-right font-bold" style={{ color: '#4f6ef7' }}>₹{totals.sanctioned.toLocaleString()}</td>
-                <td className="text-right font-bold" style={{ color: '#d0d0d0' }}>₹{totals.tender.toLocaleString()}</td>
-                <td className="text-right font-bold" style={{ color: '#3db97d' }}>₹{totals.expenditure.toLocaleString()}</td>
-                <td className="text-right font-bold" style={{ color: '#d94040' }}>{totals.critical}</td>
-                <td>
-                  <ProgressBar value={Math.round((totals.expenditure / totals.sanctioned) * 100)} showLabel />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 

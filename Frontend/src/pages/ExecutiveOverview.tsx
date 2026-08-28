@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Filter } from 'lucide-react';
+import { Download, Filter, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, PieChart, Pie, Legend, Sector, type PieSectorDataItem,
@@ -9,9 +9,12 @@ import StatCard from '../components/StatCard';
 import StageBadge from '../components/StageBadge';
 import RiskBadge from '../components/RiskBadge';
 import ProgressBar from '../components/ProgressBar';
-import { kpiSummary, works, stageDistribution, zoneProgress, monthlySpend } from '../data/mockData';
+import { useApi } from '../data/useApi';
+import { fetchKpis, fetchWorks, fetchZones, fetchFundDistribution } from '../data/api';
+import type { KpiData, WorkRecord, ZoneRecord, FundDistributionRecord } from '../data/api';
 
-// Factory that returns a brightened active-bar render function accepted by Recharts
+// ─── Chart utilities ─────────────────────────────────────────
+
 function makeBrightBar(overrideFill?: string) {
   return function ActiveBar(props: BarShapeProps) {
     const { x = 0, y = 0, width = 0, height = 0, fill = '#4f6ef7' } = props;
@@ -24,7 +27,6 @@ function makeBrightBar(overrideFill?: string) {
   };
 }
 
-// Active pie sector — expands slightly, no white ring
 function ActivePieShape(props: PieSectorDataItem) {
   const {
     cx = 0, cy = 0, innerRadius = 0, outerRadius = 0,
@@ -45,38 +47,166 @@ const TOOLTIP_STYLE = {
   borderRadius: 8, fontSize: 11, color: '#d0d0d0',
 };
 
-export default function ExecutiveOverview() {
-  const [branch, setBranch]         = useState('All');
-  const [zone,   setZone]           = useState('All');
-  const [search, setSearch]         = useState('');
+const STATUS_COLORS: Record<string, string> = {
+  'Completed': '#3db97d',
+  'In Progress': '#4f6ef7',
+  'Procurement': '#3d9bd4',
+  'Not Started': '#404040',
+  'Delayed/Held Up': '#d4a017',
+};
 
-  const critical = works.filter(w => w.riskScore >= 75);
-  const filtered = critical.filter(w =>
-    (branch === 'All' || w.branch === branch) &&
-    (zone   === 'All' || w.zone   === zone)   &&
-    (search === '' || w.name.toLowerCase().includes(search.toLowerCase()) || w.id.toLowerCase().includes(search.toLowerCase()))
+const FUND_COLORS = ['#4f6ef7', '#3d9bd4', '#3db97d', '#d4a017', '#d94040', '#8b5cf6', '#606060'];
+
+// ─── Loading skeleton component ──────────────────────────────
+
+function LoadingSkeleton({ height = 200, label = 'Loading...' }: { height?: number; label?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2" style={{ height, color: '#505050' }}>
+      <Loader2 size={20} className="animate-spin" />
+      <span className="text-[11px]">{label}</span>
+    </div>
   );
+}
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="card p-4 flex items-center gap-3" style={{ borderColor: '#d94040' }}>
+      <AlertCircle size={16} color="#d94040" />
+      <span className="text-[12px]" style={{ color: '#d0d0d0' }}>{message}</span>
+      {onRetry && (
+        <button className="btn-ghost py-1 px-2 text-[11px] ml-auto" onClick={onRetry}>
+          <RefreshCw size={12} /> Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ──────────────────────────────────────────
+
+export default function ExecutiveOverview() {
+  const [branch, setBranch] = useState('All');
+  const [zone,   setZone]   = useState('All');
+  const [search, setSearch] = useState('');
+
+  // API branch param: 'All' → undefined (no filter)
+  const apiBranch = branch === 'All' ? undefined : branch;
+
+  // Fetch data from backend
+  const { data: kpis, loading: kpisLoading, error: kpisError, refetch: refetchKpis } =
+    useApi<KpiData>(() => fetchKpis(apiBranch), [apiBranch]);
+
+  const { data: criticalWorks, loading: worksLoading, error: worksError, refetch: refetchWorks } =
+    useApi(() => fetchWorks({
+      branch: apiBranch,
+      zone: zone === 'All' ? undefined : zone,
+      page: 1,
+      page_size: 50,
+    }), [apiBranch, zone]);
+
+  const { data: zoneProgress, loading: zonesLoading } =
+    useApi<ZoneRecord[]>(() => fetchZones(apiBranch), [apiBranch]);
+
+  const { data: fundDist, loading: fundLoading } =
+    useApi<FundDistributionRecord[]>(() => fetchFundDistribution(), []);
+
+  // Derive stage distribution from KPIs delivery status
+  const stageDistribution = kpis
+    ? Object.entries(kpis.by_delivery_status)
+        .filter(([, count]) => count > 0)
+        .map(([name, value]) => ({
+          name,
+          value,
+          fill: STATUS_COLORS[name] || '#606060',
+        }))
+    : [];
+
+  // Zone chart data (group by zone, mapping B&R to BR and O&M to OM)
+  const zoneMap: Record<string, { zone: string; BR: number; OM: number }> = {};
+  (zoneProgress || []).forEach(z => {
+    const name = z.zone || 'Unknown';
+    if (!zoneMap[name]) {
+      zoneMap[name] = { zone: name, BR: 0, OM: 0 };
+    }
+    if (z.branch === 'B&R') {
+      zoneMap[name].BR = Math.round(z.avg_physical_progress);
+    } else if (z.branch === 'O&M') {
+      zoneMap[name].OM = Math.round(z.avg_physical_progress);
+    }
+  });
+  const zoneChartData = Object.values(zoneMap);
+  const uniqueZones = Object.keys(zoneMap);
+
+  // Fund distribution chart data
+  const fundChartData = (fundDist || []).map((f, i) => ({
+    name: f.fund_type,
+    expenditure: Math.round(f.total_expenditure_lacs * 100) / 100,
+    color: FUND_COLORS[i % FUND_COLORS.length],
+  }));
+
+  // Critical works (high risk) — filter from results
+  const criticalList: WorkRecord[] = (criticalWorks?.results || [])
+    .filter(w => (w.risk_score ?? 0) >= 30)
+    .sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0));
+
+  // Apply local search filter
+  const filtered = criticalList.filter(w =>
+    search === '' ||
+    (w.work_id?.toLowerCase().includes(search.toLowerCase())) ||
+    (w.work_description?.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const totalWorks = kpis?.total_works ?? 0;
+  const brWorks = kpis?.by_branch?.['B&R'] ?? 0;
+  const omWorks = kpis?.by_branch?.['O&M'] ?? 0;
+  const estCostCr = ((kpis?.total_est_cost_lacs ?? 0) / 100).toFixed(1);
+  const tenderCostCr = ((kpis?.total_tender_cost_lacs ?? 0) / 100).toFixed(1);
+  const expenditureCr = ((kpis?.total_expenditure_lacs ?? 0) / 100).toFixed(1);
+  const tenderToEstPct = kpis && kpis.total_est_cost_lacs > 0
+    ? ((kpis.total_tender_cost_lacs / kpis.total_est_cost_lacs) * 100).toFixed(1)
+    : '0';
+  const disbursedPct = kpis && kpis.total_tender_cost_lacs > 0
+    ? ((kpis.total_expenditure_lacs / kpis.total_tender_cost_lacs) * 100).toFixed(1)
+    : '0';
 
   return (
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
 
+      {/* Error banner */}
+      {(kpisError || worksError) && (
+        <ErrorBanner
+          message={kpisError || worksError || 'Failed to load data'}
+          onRetry={() => { refetchKpis(); refetchWorks(); }}
+        />
+      )}
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-        <StatCard label="Total Sanctioned Works"     value={kpiSummary.totalWorks.toLocaleString()}
-                  sub={`B&R: ${kpiSummary.brWorks} • O&M: ${kpiSummary.omWorks}`}
-                  trend="up" trendLabel="+6.8% vs Jul" accent="#4f6ef7" />
-        <StatCard label="Sanctioned Budget Outlay"   value={`₹${kpiSummary.sanctionedBudget} Cr`}
-                  sub="Total Vetted Estimate Cost"
-                  trend="up" trendLabel="+3.2% vs Jul" accent="#3d9bd4" />
-        <StatCard label="Allotted Contract Value"    value={`₹${kpiSummary.contractValue} Cr`}
-                  sub={`${((kpiSummary.contractValue/kpiSummary.sanctionedBudget)*100).toFixed(1)}% of Estimated Cost`}
-                  trend="up" trendLabel="+4.1% vs Jul" accent="#4f6ef7" />
-        <StatCard label="Verified Disbursed Payment" value={`₹${kpiSummary.disbursed} Cr`}
-                  sub={`${((kpiSummary.disbursed/kpiSummary.contractValue)*100).toFixed(1)}% Settlements Disbursed`}
-                  trend="up" trendLabel="+8.5% vs Jul" accent="#3db97d" />
-        <StatCard label="High Risk Critical Works"   value={String(kpiSummary.criticalWorks)}
-                  sub="Overdue / High Value"
-                  trend="down" trendLabel="+4 new this month" accent="#d94040" />
+        {kpisLoading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="card p-5">
+              <LoadingSkeleton height={80} label="" />
+            </div>
+          ))
+        ) : (
+          <>
+            <StatCard label="Total Sanctioned Works" value={totalWorks.toLocaleString()}
+                      sub={`B&R: ${brWorks} • O&M: ${omWorks}`}
+                      accent="#4f6ef7" />
+            <StatCard label="Sanctioned Budget Outlay" value={`₹${estCostCr} Cr`}
+                      sub="Total Vetted Estimate Cost"
+                      accent="#3d9bd4" />
+            <StatCard label="Allotted Contract Value" value={`₹${tenderCostCr} Cr`}
+                      sub={`${tenderToEstPct}% of Estimated Cost`}
+                      accent="#4f6ef7" />
+            <StatCard label="Verified Disbursed Payment" value={`₹${expenditureCr} Cr`}
+                      sub={`${disbursedPct}% Settlements Disbursed`}
+                      accent="#3db97d" />
+            <StatCard label="Financial Anomalies" value={String(kpis?.anomaly_count ?? 0)}
+                      sub="Progress > 100% flagged"
+                      accent="#d94040" />
+          </>
+        )}
       </div>
 
       {/* Charts Row */}
@@ -84,74 +214,89 @@ export default function ExecutiveOverview() {
 
         {/* Stage Distribution Donut */}
         <div className="card p-5 flex flex-col gap-3">
-          <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Works by Project Stage</h3>
-          <p className="text-[11px]" style={{ color: '#505050' }}>Current portfolio distribution — 1,158 works</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={stageDistribution}
-                cx="50%" cy="50%"
-                innerRadius={55} outerRadius={80}
-                dataKey="value"
-                strokeWidth={0}
-                stroke="none"
-                activeShape={ActivePieShape}
-              >
-                {stageDistribution.map((entry, i) => <Cell key={i} fill={entry.fill} stroke="none" />)}
-              </Pie>
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#606060' }} />
-            </PieChart>
-          </ResponsiveContainer>
+          <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Works by Delivery Status</h3>
+          <p className="text-[11px]" style={{ color: '#505050' }}>
+            Current portfolio distribution — {totalWorks.toLocaleString()} works
+          </p>
+          {kpisLoading ? (
+            <LoadingSkeleton />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={stageDistribution}
+                  cx="50%" cy="50%"
+                  innerRadius={55} outerRadius={80}
+                  dataKey="value"
+                  strokeWidth={0}
+                  stroke="none"
+                  activeShape={ActivePieShape}
+                >
+                  {stageDistribution.map((entry, i) => <Cell key={i} fill={entry.fill} stroke="none" />)}
+                </Pie>
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#606060' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         {/* Zone Progress Grouped Bar */}
         <div className="card p-5 flex flex-col gap-3">
           <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Progress by Zone</h3>
           <p className="text-[11px]" style={{ color: '#505050' }}>Avg physical progress — B&amp;R vs O&amp;M</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={zoneProgress} barGap={2} barSize={10}>
-              <XAxis dataKey="zone" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
-              <Bar dataKey="BR" fill="#4f6ef7" radius={[3,3,0,0]} name="B&R"
-                   activeBar={makeBrightBar('#7b93ff')} />
-              <Bar dataKey="OM" fill="#3d9bd4" radius={[3,3,0,0]} name="O&M"
-                   activeBar={makeBrightBar('#60b8e8')} />
-            </BarChart>
-          </ResponsiveContainer>
+          {zonesLoading ? (
+            <LoadingSkeleton />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={zoneChartData} barGap={2} barSize={10}>
+                <XAxis dataKey="zone" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
+                <Bar dataKey="BR" fill="#4f6ef7" radius={[3,3,0,0]} name="B&R"
+                     activeBar={makeBrightBar('#7b93ff')} />
+                <Bar dataKey="OM" fill="#3d9bd4" radius={[3,3,0,0]} name="O&M"
+                     activeBar={makeBrightBar('#60b8e8')} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
-        {/* Monthly Spend */}
+        {/* Expenditure by Fund Type (replaces Monthly Spend) */}
         <div className="card p-5 flex flex-col gap-3">
-          <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Monthly Disbursements (₹ Cr)</h3>
-          <p className="text-[11px]" style={{ color: '#505050' }}>FY 2023–24 payment trend</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={monthlySpend} barSize={14}>
-              <XAxis dataKey="month" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
-              <Bar dataKey="spend" name="₹ Cr" radius={[3,3,0,0]} activeBar={makeBrightBar()}>
-                {monthlySpend.map((_, i) => (
-                  <Cell key={i} fill={i === monthlySpend.length - 1 ? '#d4a017' : '#4f6ef7'} stroke="none" />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Expenditure by Fund Type (₹ Lacs)</h3>
+          <p className="text-[11px]" style={{ color: '#505050' }}>Disbursement distribution across funding sources</p>
+          {fundLoading ? (
+            <LoadingSkeleton />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={fundChartData} barSize={14}>
+                <XAxis dataKey="name" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }}
+                         formatter={(v) => [`₹${Number(v).toLocaleString()} L`, '']} />
+                <Bar dataKey="expenditure" name="₹ Lacs" radius={[3,3,0,0]} activeBar={makeBrightBar()}>
+                  {fundChartData.map((d, i) => (
+                    <Cell key={i} fill={d.color} stroke="none" />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
-      {/* Commissioner Priority Table */}
+      {/* High Risk Works Table */}
       <div className="card overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4"
              style={{ borderBottom: '1px solid #1f1f1f', background: '#111111' }}>
           <div>
             <div className="flex items-center gap-3">
-              <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Commissioner's Priority Monitoring List</h3>
-              <span className="badge badge-danger">{kpiSummary.criticalWorks} Critical</span>
+              <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>High Risk Works Monitoring</h3>
+              <span className="badge badge-danger">{criticalList.length} Flagged</span>
             </div>
             <p className="text-[11px] mt-0.5" style={{ color: '#505050' }}>
-              Works requiring attention before next review — sorted by risk score
+              Works with risk score ≥ 30 — sorted by severity
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -160,12 +305,12 @@ export default function ExecutiveOverview() {
               <Filter size={12} color="#505050" />
               <select className="input-dark text-[11px] py-1.5" value={branch} onChange={e => setBranch(e.target.value)}>
                 <option value="All">All Branches</option>
-                <option>B&R</option><option>O&M</option><option>Light</option><option>SWM</option>
+                <option>B&R</option><option>O&M</option>
               </select>
             </div>
             <select className="input-dark text-[11px] py-1.5" value={zone} onChange={e => setZone(e.target.value)}>
               <option value="All">All Zones</option>
-              {['Zone A','Zone B','Zone C','Zone D','Zone E'].map(z => <option key={z}>{z}</option>)}
+              {uniqueZones.map(z => <option key={z} value={z}>{z}</option>)}
             </select>
             <input className="input-dark text-[11px] py-1.5" style={{ width: 160 }}
                    placeholder="Search ID or work..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -176,43 +321,49 @@ export default function ExecutiveOverview() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full" style={{ minWidth: 900 }}>
-            <thead className="tbl-head">
-              <tr>
-                <th>Work ID</th>
-                <th style={{ minWidth: 260 }}>Description</th>
-                <th>Branch / Zone</th>
-                <th>Ward</th>
-                <th>Agency</th>
-                <th>Stage</th>
-                <th style={{ minWidth: 160 }}>Physical Progress</th>
-                <th>Risk Score</th>
-                <th>Cost (Lacs)</th>
-              </tr>
-            </thead>
-            <tbody className="tbl-body">
-              {filtered.map(w => (
-                <tr key={w.id}>
-                  <td><span className="font-semibold" style={{ color: '#a0a0a0' }}>{w.id}</span></td>
-                  <td style={{ color: '#c0c0c0', maxWidth: 280 }}>
-                    <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {w.name}
-                    </div>
-                  </td>
-                  <td>{w.branch} / {w.zone}</td>
-                  <td>{w.ward}</td>
-                  <td>{w.agency}</td>
-                  <td><StageBadge stage={w.stage} /></td>
-                  <td><ProgressBar value={w.physicalProgress} showLabel /></td>
-                  <td><RiskBadge score={w.riskScore} /></td>
-                  <td style={{ color: '#d0d0d0' }}>₹{w.estimateCost.toFixed(1)}</td>
+          {worksLoading ? (
+            <LoadingSkeleton height={200} label="Loading works..." />
+          ) : (
+            <table className="w-full" style={{ minWidth: 900 }}>
+              <thead className="tbl-head">
+                <tr>
+                  <th>Work ID</th>
+                  <th style={{ minWidth: 260 }}>Description</th>
+                  <th>Branch / Zone</th>
+                  <th>Ward</th>
+                  <th>Agency</th>
+                  <th>Status</th>
+                  <th style={{ minWidth: 160 }}>Physical Progress</th>
+                  <th>Risk Score</th>
+                  <th>Cost (Lacs)</th>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={9} className="text-center py-8" style={{ color: '#404040' }}>No results found</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="tbl-body">
+                {filtered.map(w => (
+                  <tr key={w.work_id}>
+                    <td><span className="font-semibold" style={{ color: '#a0a0a0' }}>{w.work_id}</span></td>
+                    <td style={{ color: '#c0c0c0', maxWidth: 280 }}>
+                      <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {w.work_description || '—'}
+                      </div>
+                    </td>
+                    <td>{w.branch} / {w.zone || '—'}</td>
+                    <td>{w.ward || '—'}</td>
+                    <td>{w.agency_name || '—'}</td>
+                    <td><StageBadge stage={w.delivery_status || 'Not Started'} /></td>
+                    <td><ProgressBar value={w.physical_progress_pct ?? 0} showLabel /></td>
+                    <td><RiskBadge score={w.risk_score ?? 0} /></td>
+                    <td style={{ color: '#d0d0d0' }}>₹{(w.est_cost_lacs ?? 0).toFixed(1)}</td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={9} className="text-center py-8" style={{ color: '#404040' }}>
+                    {worksLoading ? 'Loading...' : 'No high-risk works found'}
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 

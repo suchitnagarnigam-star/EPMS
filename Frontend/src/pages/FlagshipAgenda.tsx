@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Info } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   type BarShapeProps,
@@ -121,6 +121,14 @@ export default function FlagshipAgenda() {
 
   return (
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
+
+      {/* Reference data banner */}
+      <div className="card p-3.5 flex items-center gap-3" style={{ borderColor: '#3d9bd4', background: '#0d1b2a' }}>
+        <Info size={16} color="#3d9bd4" />
+        <span className="text-[12px]" style={{ color: '#8bb8d4' }}>
+          Flagship data from last manual import — live sync pipeline coming in Phase 5
+        </span>
+      </div>
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

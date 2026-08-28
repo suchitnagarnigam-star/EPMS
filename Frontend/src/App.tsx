@@ -9,6 +9,7 @@ import ContractorMatrix      from './pages/ContractorMatrix';
 import ConstituencyFunds     from './pages/ConstituencyFunds';
 import MasterWorksDirectory  from './pages/MasterWorksDirectory';
 import FlagshipAgenda        from './pages/FlagshipAgenda';
+import DataQuality           from './pages/DataQuality';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
                 <Route path="constituencies"    element={<ConstituencyFunds />}    />
                 <Route path="works"             element={<MasterWorksDirectory />} />
                 <Route path="flagship"          element={<FlagshipAgenda />}       />
+                <Route path="quality"           element={<DataQuality />}          />
               </Route>
             </Route>
 
