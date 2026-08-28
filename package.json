@@ -1,0 +1,13 @@
+{
+  "name": "mcl-analytics-root",
+  "version": "1.0.0",
+  "description": "Root package manager for MCL Analytics platform",
+  "scripts": {
+    "dev:backend": "cd Backend && .venv\\Scripts\\python.exe -m uvicorn main:app --reload --port 8000",
+    "dev:frontend": "cd Frontend && npm run dev",
+    "dev:full": "npx concurrently -k -p \"[{name}]\" -n \"Backend,Frontend\" -c \"yellow,blue\" \"npm run dev:backend\" \"npm run dev:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
