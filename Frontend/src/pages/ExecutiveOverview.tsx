@@ -238,7 +238,7 @@ export default function ExecutiveOverview() {
                 >
                   {stageDistribution.map((entry, i) => <Cell key={i} fill={entry.fill} stroke="none" />)}
                 </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#606060' }} />
               </PieChart>
             </ResponsiveContainer>
@@ -256,7 +256,7 @@ export default function ExecutiveOverview() {
               <BarChart data={zoneChartData} barGap={2} barSize={10}>
                 <XAxis dataKey="zone" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
                 <Bar dataKey="BR" fill="#4f6ef7" radius={[3,3,0,0]} name="B&R"
                      activeBar={makeBrightBar('#7b93ff')} />
                 <Bar dataKey="OM" fill="#3d9bd4" radius={[3,3,0,0]} name="O&M"

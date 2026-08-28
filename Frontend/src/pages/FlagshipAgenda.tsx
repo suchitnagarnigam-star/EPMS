@@ -22,8 +22,14 @@ function makeBrightBar(overrideFill?: string) {
 }
 
 const TOOLTIP_STYLE = {
-  background: '#1a1a1a', border: '1px solid #2a2a2a',
-  borderRadius: 8, fontSize: 11, color: '#d0d0d0',
+  background: 'var(--card)',
+  border: '1px solid var(--glass-border)',
+  borderRadius: 10,
+  fontSize: 12,
+  color: 'var(--text-1)',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  boxShadow: 'var(--glass-shadow)',
 };
 
 function stageBadgeFor(w: FlagshipWork) {
@@ -155,7 +161,7 @@ export default function FlagshipAgenda() {
           <BarChart data={chartData} barGap={1} barSize={9}>
             <XAxis dataKey="name" tick={{ fill: '#404040', fontSize: 9 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
             <Bar dataKey="physical" name="Physical %" radius={[2,2,0,0]} activeBar={makeBrightBar()}>
               {chartData.map((d, i) => <Cell key={i} fill={d.fill} stroke="none" />)}
             </Bar>

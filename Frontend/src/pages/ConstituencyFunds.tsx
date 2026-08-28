@@ -11,8 +11,14 @@ import { fetchConstituencies } from '../data/api';
 import type { ConstituencyRecord } from '../data/api';
 
 const TOOLTIP_STYLE = {
-  background: '#1a1a1a', border: '1px solid #2a2a2a',
-  borderRadius: 8, fontSize: 11, color: '#d0d0d0',
+  background: 'var(--card)',
+  border: '1px solid var(--glass-border)',
+  borderRadius: 10,
+  fontSize: 12,
+  color: 'var(--text-1)',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  boxShadow: 'var(--glass-shadow)',
 };
 
 const COLORS = ['#4f6ef7','#3d9bd4','#3db97d','#d4a017','#d94040','#8b5cf6','#606060','#e879f9','#f97316'];
@@ -153,7 +159,7 @@ export default function ConstituencyFunds() {
               <BarChart data={utilData} barGap={3} barSize={14}>
                 <XAxis dataKey="name" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }}
+                <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                          formatter={(v) => [`₹${Number(v)} Cr`, '']} />
                 <Bar dataKey="sanctioned" name="Sanctioned (₹ Cr)" fill="#4f6ef7" radius={[3,3,0,0]}
                      activeBar={makeBrightBar('#7b93ff')} />
