@@ -58,7 +58,11 @@ async def get_works(
 
     if search:
         params.append(f"%{search}%")
-        conditions.append(f"F.work_description ILIKE ${len(params)}")
+        conditions.append(
+            f"(F.work_description ILIKE ${len(params)}"
+            f" OR F.work_id ILIKE ${len(params)}"
+            f" OR A.agency_name ILIKE ${len(params)})"
+        )
 
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
 
@@ -67,6 +71,7 @@ async def get_works(
         SELECT COUNT(*)::integer
         FROM fact_works F
         LEFT JOIN dim_location L ON F.location_id = L.location_id
+        LEFT JOIN dim_agency A ON F.agency_id = A.agency_id
         WHERE {where_clause}
     """
     total = await conn.fetchval(count_query, *params)

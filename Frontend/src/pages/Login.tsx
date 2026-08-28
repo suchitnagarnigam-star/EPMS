@@ -26,39 +26,60 @@ export default function Login() {
 
     setLoading(true);
 
-    // Simulate a tiny async delay for UX feel
     setTimeout(() => {
       login(identifier.trim(), password);
       navigate('/', { replace: true });
-    }, 600);
+    }, 700);
   }
 
   return (
     <div
       className="min-h-screen w-full flex items-center justify-center p-4"
-      style={{ background: 'var(--bg)' }}
+      style={{ background: 'var(--bg)', overflow: 'hidden', position: 'relative' }}
     >
-      {/* Subtle background radial glow — same depth as rest of app */}
-      <div
-        className="pointer-events-none fixed inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(79,110,247,0.07) 0%, transparent 70%)',
-        }}
-      />
+      {/* ── Animated floating orbs ── */}
+      <div className="pointer-events-none fixed inset-0" aria-hidden>
+        {/* Orb 1 */}
+        <div style={{
+          position: 'absolute', top: '10%', left: '15%',
+          width: 420, height: 420, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(79,110,247,0.14) 0%, transparent 65%)',
+          animation: 'floatOrb 12s ease-in-out infinite',
+        }} />
+        {/* Orb 2 */}
+        <div style={{
+          position: 'absolute', bottom: '15%', right: '20%',
+          width: 350, height: 350, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(52,211,153,0.09) 0%, transparent 65%)',
+          animation: 'floatOrb 16s ease-in-out infinite reverse',
+          animationDelay: '-4s',
+        }} />
+        {/* Orb 3 — subtle top-right */}
+        <div style={{
+          position: 'absolute', top: '-5%', right: '5%',
+          width: 280, height: 280, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(79,110,247,0.07) 0%, transparent 65%)',
+          animation: 'floatOrb 20s ease-in-out infinite',
+          animationDelay: '-8s',
+        }} />
+      </div>
 
-      <div className="w-full max-w-[400px] relative z-10">
+      {/* ── Card ── */}
+      <div className="w-full max-w-[400px] relative z-10 animate-slide-up">
 
-        {/* ── BRAND HEADER ── */}
+        {/* Brand header */}
         <div className="flex flex-col items-center mb-8">
           <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-            style={{             background: 'var(--accent)', boxShadow: '0 0 32px rgba(79,110,247,0.25)' }}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+            style={{
+              background: 'var(--accent)',
+              boxShadow: '0 0 40px rgba(79,110,247,0.40), 0 8px 24px rgba(79,110,247,0.25)',
+            }}
           >
-            <Activity size={22} color="#fff" />
+            <Activity size={26} color="#fff" />
           </div>
           <h1
-            className="text-[22px] font-bold tracking-tight"
+            className="text-[24px] font-bold tracking-tight"
             style={{ color: 'var(--text-1)' }}
           >
             EPMS
@@ -68,13 +89,15 @@ export default function Login() {
           </p>
         </div>
 
-        {/* ── CARD ── */}
+        {/* Glass login card */}
         <div
           className="rounded-2xl p-7"
           style={{
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.45)',
+            background: 'var(--glass-bg)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: 'var(--glass-shadow-lg)',
           }}
         >
           <h2
@@ -89,23 +112,24 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
 
-            {/* Username / Email */}
+            {/* Username */}
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor="identifier"
-                className="text-[11px] font-semibold uppercase tracking-wider"
-                style={{ color: '#505050' }}
+                className="text-[11px] font-semibold uppercase tracking-widest"
+                style={{ color: 'var(--text-3)' }}
               >
                 Username or Email
               </label>
               <div
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors"
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all"
                 style={{
                   background: 'var(--input-bg)',
-                  border: `1px solid ${identifier ? '#333333' : '#1e1e1e'}`,
+                  border: `1px solid ${identifier ? 'var(--input-focus)' : 'var(--input-border)'}`,
+                  boxShadow: identifier ? '0 0 0 3px rgba(79,110,247,0.12)' : 'none',
                 }}
               >
-                <User size={14} color="#404040" strokeWidth={1.5} />
+                <User size={14} color="var(--text-3)" strokeWidth={1.5} />
                 <input
                   id="identifier"
                   type="text"
@@ -124,19 +148,20 @@ export default function Login() {
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor="password"
-                className="text-[11px] font-semibold uppercase tracking-wider"
+                className="text-[11px] font-semibold uppercase tracking-widest"
                 style={{ color: 'var(--text-3)' }}
               >
                 Password
               </label>
               <div
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors"
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all"
                 style={{
                   background: 'var(--input-bg)',
-                  border: `1px solid ${password ? '#333333' : '#1e1e1e'}`,
+                  border: `1px solid ${password ? 'var(--input-focus)' : 'var(--input-border)'}`,
+                  boxShadow: password ? '0 0 0 3px rgba(79,110,247,0.12)' : 'none',
                 }}
               >
-                <Lock size={14} color="#404040" strokeWidth={1.5} />
+                <Lock size={14} color="var(--text-3)" strokeWidth={1.5} />
                 <input
                   id="password"
                   type={showPass ? 'text' : 'password'}
@@ -160,11 +185,15 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Error message */}
+            {/* Error */}
             {error && (
               <p
-                className="text-[12px] px-3 py-2 rounded-lg"
-                style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger)' }}
+                className="text-[12px] px-3 py-2 rounded-lg animate-fade-in"
+                style={{
+                  background: 'var(--danger-bg)',
+                  color: 'var(--danger)',
+                  border: '1px solid var(--danger)',
+                }}
               >
                 {error}
               </p>
@@ -176,19 +205,21 @@ export default function Login() {
               disabled={loading}
               className="mt-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-semibold transition-all"
               style={{
-                background: loading ? 'var(--accent-hover)' : 'var(--accent)',
+                background: loading
+                  ? 'var(--accent-hover)'
+                  : 'linear-gradient(135deg, #5b7cff 0%, #4f6ef7 50%, #3a57e0 100%)',
+                backgroundSize: '200% auto',
                 color: '#fff',
-                opacity: loading ? 0.75 : 1,
+                opacity: loading ? 0.80 : 1,
                 cursor: loading ? 'not-allowed' : 'pointer',
-                boxShadow: loading ? 'none' : '0 4px 20px rgba(79,110,247,0.30)',
+                boxShadow: loading ? 'none' : '0 4px 24px rgba(79,110,247,0.40)',
+                animation: loading ? 'shimmer 1.8s linear infinite' : 'none',
               }}
             >
               {loading ? (
                 <>
-                  <span
-                    className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin"
-                  />
-                  Signing in…
+                  <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Signing in...
                 </>
               ) : (
                 <>
@@ -208,8 +239,10 @@ export default function Login() {
         <button
           type="button"
           onClick={toggle}
-          className="block mx-auto mt-3 text-[11px]"
+          className="block mx-auto mt-3 text-[11px] transition-colors"
           style={{ color: 'var(--text-3)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-2)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-3)'; }}
         >
           Switch to {theme === 'dark' ? 'light' : 'dark'} mode
         </button>

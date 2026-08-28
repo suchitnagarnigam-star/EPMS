@@ -1,8 +1,8 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, MapPin,
-  Star, Bell, Search, ChevronDown, Activity, LogOut,
-  Sun, Moon, ShieldAlert
+  Star, Bell, ChevronDown, Activity, LogOut,
+  Sun, Moon, ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -41,32 +41,68 @@ export default function Layout() {
   const isDark = theme === 'dark';
 
   return (
-    <div className="flex h-full overflow-hidden" style={{ background: 'var(--bg)' }}>
+    <div
+      className="flex h-full overflow-hidden"
+      style={{ background: 'var(--bg)', position: 'relative' }}
+    >
+      {/* ── Ambient background mesh ── */}
+      <div
+        className="pointer-events-none fixed inset-0"
+        style={{ zIndex: 0 }}
+        aria-hidden
+      >
+        {/* Top-left orb */}
+        <div style={{
+          position: 'absolute', top: '-15%', left: '-10%',
+          width: 600, height: 600, borderRadius: '50%',
+          background: 'radial-gradient(circle, var(--mesh-a) 0%, transparent 65%)',
+          animation: 'floatOrb 14s ease-in-out infinite',
+        }} />
+        {/* Bottom-right orb */}
+        <div style={{
+          position: 'absolute', bottom: '-20%', right: '-5%',
+          width: 500, height: 500, borderRadius: '50%',
+          background: 'radial-gradient(circle, var(--mesh-b) 0%, transparent 65%)',
+          animation: 'floatOrb 18s ease-in-out infinite reverse',
+          animationDelay: '-6s',
+        }} />
+      </div>
 
       {/* ══════════════ SIDEBAR ══════════════ */}
       <aside
         className="flex flex-col shrink-0 h-full overflow-hidden"
         style={{
-          width: 220,
+          width: 224,
+          position: 'relative',
+          zIndex: 10,
           background: 'var(--sidebar-bg)',
-          borderRight: '1px solid var(--border)',
-          transition: 'background 0.2s',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderRight: '1px solid var(--glass-border)',
+          transition: 'background 0.3s',
         }}
       >
         {/* Brand */}
         <div
-          className="flex items-center gap-2.5 px-5 py-4"
-          style={{ borderBottom: '1px solid var(--border)' }}
+          className="flex items-center gap-3 px-5 py-4"
+          style={{ borderBottom: '1px solid var(--glass-border)' }}
         >
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: 'var(--accent)' }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{
+              background: 'var(--accent)',
+              boxShadow: '0 0 20px rgba(79,110,247,0.40)',
+            }}
           >
-            <Activity size={16} color="#fff" />
+            <Activity size={17} color="#fff" />
           </div>
           <div>
-            <p className="text-[14px] font-bold leading-none" style={{ color: 'var(--text-1)' }}>EPMS</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>MCL • Ludhiana</p>
+            <p className="text-[14px] font-bold leading-none" style={{ color: 'var(--text-1)' }}>
+              EPMS
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>
+              MCL • Ludhiana
+            </p>
           </div>
         </div>
 
@@ -74,27 +110,34 @@ export default function Layout() {
         <nav className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-0.5">
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
             <NavLink
-              key={to} to={to} end={to === '/'}
+              key={to}
+              to={to}
+              end={to === '/'}
               style={({ isActive }) => ({
                 display: 'flex',
                 alignItems: 'center',
-                gap: 12,
-                padding: isActive ? '10px 12px 10px 15px' : '10px 12px',
-                borderRadius: isActive ? '0 8px 8px 0' : 8,
-                marginLeft: isActive ? -4 : 0,
+                gap: 10,
+                padding: '9px 12px',
+                borderRadius: 8,
                 fontSize: 12.5,
-                fontWeight: 500,
-                background: isActive ? 'var(--accent-dim)' : 'transparent',
+                fontWeight: isActive ? 600 : 500,
+                background: isActive
+                  ? 'rgba(79, 110, 247, 0.15)'
+                  : 'transparent',
                 color: isActive ? 'var(--accent-text)' : 'var(--text-3)',
-                borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
+                borderLeft: isActive
+                  ? '2px solid var(--accent)'
+                  : '2px solid transparent',
                 textDecoration: 'none',
-                transition: 'background 0.15s, color 0.15s',
+                transition: 'background 0.15s, color 0.15s, transform 0.12s, border-color 0.15s',
+                transform: 'translateX(0)',
               })}
               onMouseEnter={e => {
                 const el = e.currentTarget;
                 if (!el.getAttribute('aria-current')) {
                   el.style.background = 'var(--hover)';
                   el.style.color = 'var(--text-2)';
+                  el.style.transform = 'translateX(2px)';
                 }
               }}
               onMouseLeave={e => {
@@ -102,12 +145,17 @@ export default function Layout() {
                 if (!el.getAttribute('aria-current')) {
                   el.style.background = 'transparent';
                   el.style.color = 'var(--text-3)';
+                  el.style.transform = 'translateX(0)';
                 }
               }}
             >
               {({ isActive }) => (
                 <>
-                  <Icon size={16} color={isActive ? 'var(--accent)' : undefined} />
+                  <Icon
+                    size={15}
+                    color={isActive ? 'var(--accent)' : undefined}
+                    strokeWidth={isActive ? 2 : 1.75}
+                  />
                   <span>{label}</span>
                 </>
               )}
@@ -118,46 +166,38 @@ export default function Layout() {
         {/* Sidebar footer */}
         <div
           className="px-4 py-3 flex flex-col gap-1"
-          style={{ borderTop: '1px solid var(--border)', color: 'var(--text-4)' }}
+          style={{
+            borderTop: '1px solid var(--glass-border)',
+            color: 'var(--text-4)',
+          }}
         >
           <SyncStatus />
         </div>
       </aside>
 
       {/* ══════════════ MAIN ══════════════ */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ position: 'relative', zIndex: 5 }}>
 
         {/* Topbar */}
         <header
           className="h-[52px] flex items-center justify-between px-6 shrink-0"
           style={{
             background: 'var(--topbar-bg)',
-            borderBottom: '1px solid var(--border)',
-            transition: 'background 0.2s',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderBottom: '1px solid var(--glass-border)',
+            transition: 'background 0.3s',
+            position: 'relative',
+            zIndex: 10,
           }}
         >
-          {/* Search */}
-          <div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-            style={{
-              background: 'var(--input-bg)',
-              border: '1px solid var(--input-border)',
-              width: 240,
-            }}
-          >
-            <Search size={13} color="var(--text-3)" />
-            <input
-              className="flex-1 bg-transparent outline-none text-[12px]"
-              style={{ color: 'var(--text-1)' }}
-              placeholder="Search works, agencies..."
-            />
-          </div>
+          {/* Page title */}
+          <span className="text-[13px] font-semibold hidden md:block" style={{ color: 'var(--text-2)' }}>
+            {title}
+          </span>
 
           {/* Right actions */}
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] font-medium hidden md:block" style={{ color: 'var(--text-4)' }}>
-              {title}
-            </span>
+          <div className="flex items-center gap-3 ml-auto">
             <div className="hidden lg:block">
               <SyncStatus />
             </div>
@@ -166,12 +206,22 @@ export default function Layout() {
             <button
               onClick={toggle}
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-lg transition-all"
               style={{
-                background: 'var(--card-alt)',
-                border: '1px solid var(--border)',
+                background: 'var(--glass-bg)',
+                border: '1px solid var(--glass-border)',
                 color: 'var(--text-2)',
                 cursor: 'pointer',
+              }}
+              onMouseEnter={e => {
+                const b = e.currentTarget;
+                b.style.background = 'var(--hover)';
+                b.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={e => {
+                const b = e.currentTarget;
+                b.style.background = 'var(--glass-bg)';
+                b.style.transform = 'scale(1)';
               }}
             >
               {isDark
@@ -181,18 +231,30 @@ export default function Layout() {
             </button>
 
             {/* Notifications */}
-            <button className="relative" style={{ color: 'var(--text-3)' }}>
-              <Bell size={16} />
+            <button
+              className="relative w-8 h-8 flex items-center justify-center rounded-lg"
+              style={{ color: 'var(--text-3)' }}
+            >
+              <Bell size={15} strokeWidth={1.75} />
               <span
-                className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
-                style={{ background: 'var(--danger)' }}
+                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
+                style={{
+                  background: 'var(--danger)',
+                  animation: 'pulse-dot 2s ease-in-out infinite',
+                }}
               />
             </button>
 
-            {/* User */}
-            <div className="flex items-center gap-2">
+            {/* User chip */}
+            <div
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+              style={{
+                background: 'var(--glass-bg)',
+                border: '1px solid var(--glass-border)',
+              }}
+            >
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
                 style={{ background: 'var(--accent-dim)', color: 'var(--accent-text)' }}
               >
                 {user ? user.slice(0, 2).toUpperCase() : 'AS'}
@@ -203,7 +265,7 @@ export default function Layout() {
                 </p>
                 <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>Commissioner</p>
               </div>
-              <ChevronDown size={12} color="var(--text-3)" />
+              <ChevronDown size={11} color="var(--text-3)" />
             </div>
 
             {/* Sign out */}
@@ -213,7 +275,7 @@ export default function Layout() {
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all"
               style={{
                 color: 'var(--text-3)',
-                border: '1px solid var(--border)',
+                border: '1px solid var(--glass-border)',
                 background: 'transparent',
                 cursor: 'pointer',
               }}
@@ -226,7 +288,7 @@ export default function Layout() {
               onMouseLeave={e => {
                 const b = e.currentTarget;
                 b.style.color = 'var(--text-3)';
-                b.style.borderColor = 'var(--border)';
+                b.style.borderColor = 'var(--glass-border)';
                 b.style.background = 'transparent';
               }}
             >
@@ -237,7 +299,7 @@ export default function Layout() {
         </header>
 
         {/* Page canvas */}
-        <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
+        <main className="flex-1 overflow-y-auto" style={{ background: 'transparent' }}>
           <Outlet />
         </main>
       </div>

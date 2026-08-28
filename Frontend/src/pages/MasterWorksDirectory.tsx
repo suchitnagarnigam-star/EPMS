@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import StageBadge from '../components/StageBadge';
 import RiskBadge from '../components/RiskBadge';
@@ -16,15 +16,17 @@ export default function MasterWorksDirectory() {
   const [stage,    setStage]    = useState('All');
   const [page,     setPage]     = useState(1);
 
-  // Debounced search: we use the search value directly in the API call
+  // Debounced search: update debouncedSearch 400ms after search state settles
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const handleSearchChange = useCallback((value: string) => {
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer); // clears previous timer on every keystroke
+  }, [search]);
+
+  function handleSearchChange(value: string) {
     setSearch(value);
     setPage(1);
-    // Simple debounce via timeout
-    const timer = setTimeout(() => setDebouncedSearch(value), 400);
-    return () => clearTimeout(timer);
-  }, []);
+  }
 
   // Fetch from API with server-side filtering + pagination
   const { data, loading, error } = useApi(

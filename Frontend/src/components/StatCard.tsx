@@ -9,29 +9,60 @@ interface Props {
   trendLabel?: string;
   accent?: string;
   icon?: ReactNode;
+  delay?: number; // stagger delay in ms
 }
 
-export default function StatCard({ label, value, sub, trend, trendLabel, accent = '#4f6ef7', icon }: Props) {
+export default function StatCard({
+  label, value, sub, trend, trendLabel,
+  accent = '#4f6ef7', icon, delay = 0,
+}: Props) {
   return (
-    <div className="card p-5 flex flex-col gap-2.5">
+    <div
+      className="card p-5 flex flex-col gap-2.5 stat-glow animate-slide-up"
+      style={{
+        animationDelay: `${delay}ms`,
+        borderTop: `2px solid ${accent}40`,
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow =
+          `0 8px 32px rgba(0,0,0,0.40), 0 0 28px ${accent}20`;
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = '';
+      }}
+    >
       <div className="flex items-start justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#606060' }}>{label}</span>
+        <span
+          className="text-[10px] font-semibold uppercase tracking-widest"
+          style={{ color: 'var(--text-3)' }}
+        >
+          {label}
+        </span>
         {icon && (
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#1a1a1a' }}>
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: `${accent}18`, color: accent }}
+          >
             {icon}
           </div>
         )}
       </div>
       <div>
-        <p className="text-[26px] font-bold leading-none" style={{ color: accent }}>{value}</p>
-        {sub && <p className="text-[11px] mt-1.5" style={{ color: '#505050' }}>{sub}</p>}
+        <p className="text-[28px] font-bold leading-none" style={{ color: accent }}>
+          {value}
+        </p>
+        {sub && (
+          <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-3)' }}>
+            {sub}
+          </p>
+        )}
       </div>
       {trendLabel && (
         <div className="flex items-center gap-1.5 mt-auto">
-          {trend === 'up'   && <TrendingUp  size={12} color="#3db97d" />}
-          {trend === 'down' && <TrendingDown size={12} color="#d94040" />}
-          {trend === 'flat' && <Minus size={12} color="#808080" />}
-          <span className="text-[10px]" style={{ color: '#505050' }}>{trendLabel}</span>
+          {trend === 'up'   && <TrendingUp   size={12} color="var(--success)" />}
+          {trend === 'down' && <TrendingDown  size={12} color="var(--danger)"  />}
+          {trend === 'flat' && <Minus         size={12} color="var(--text-3)"  />}
+          <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>{trendLabel}</span>
         </div>
       )}
     </div>

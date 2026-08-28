@@ -85,6 +85,7 @@ class WorkSyncItem(BaseModel):
     nature_of_work: Optional[str] = Field(None, validation_alias=AliasChoices('nature_of_work', 'nature', 'Nature of Work'))
 
     # Officer
+    officer_id: Optional[int] = Field(None, validation_alias=AliasChoices('officer_id', 'officer_fk', 'OfficerId'))
     officer_name: Optional[str] = Field(None, validation_alias=AliasChoices('officer_name', 'officer', 'Officer Name', 'Name of Officer'))
 
     # Work Details
@@ -117,7 +118,10 @@ class WorkSyncItem(BaseModel):
     start_date: Optional[date] = None
     time_limit_months: Optional[float] = None
     scheduled_end_date: Optional[date] = None
-    actual_completion_date: Optional[date] = None
+    actual_completion_date: Optional[date] = Field(None, validation_alias=AliasChoices(
+        'actual_completion_date', 'actual_completion', 'Actual Completion Date',
+        'Date of Completion', 'completion_date',
+    ))
 
     # Progress
     physical_progress_pct: Optional[float] = Field(None, validation_alias=AliasChoices('physical_progress_pct', 'physical_progress'))

@@ -43,8 +43,12 @@ function ActivePieShape(props: PieSectorDataItem) {
 }
 
 const TOOLTIP_STYLE = {
-  background: '#1a1a1a', border: '1px solid #2a2a2a',
-  borderRadius: 8, fontSize: 11, color: '#d0d0d0',
+  background: 'var(--card)',
+  border: '1px solid var(--glass-border)',
+  borderRadius: 8,
+  fontSize: 11,
+  color: 'var(--text-2)',
+  backdropFilter: 'blur(8px)',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -192,19 +196,19 @@ export default function ExecutiveOverview() {
           <>
             <StatCard label="Total Sanctioned Works" value={totalWorks.toLocaleString()}
                       sub={`B&R: ${brWorks} • O&M: ${omWorks}`}
-                      accent="#4f6ef7" />
+                      accent="#4f6ef7" delay={0} />
             <StatCard label="Sanctioned Budget Outlay" value={`₹${estCostCr} Cr`}
                       sub="Total Vetted Estimate Cost"
-                      accent="#3d9bd4" />
+                      accent="#38bdf8" delay={60} />
             <StatCard label="Allotted Contract Value" value={`₹${tenderCostCr} Cr`}
                       sub={`${tenderToEstPct}% of Estimated Cost`}
-                      accent="#4f6ef7" />
+                      accent="#4f6ef7" delay={120} />
             <StatCard label="Verified Disbursed Payment" value={`₹${expenditureCr} Cr`}
                       sub={`${disbursedPct}% Settlements Disbursed`}
-                      accent="#3db97d" />
+                      accent="#34d399" delay={180} />
             <StatCard label="Financial Anomalies" value={String(kpis?.anomaly_count ?? 0)}
                       sub="Progress > 100% flagged"
-                      accent="#d94040" />
+                      accent="#f87171" delay={240} />
           </>
         )}
       </div>
@@ -213,9 +217,9 @@ export default function ExecutiveOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Stage Distribution Donut */}
-        <div className="card p-5 flex flex-col gap-3">
-          <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Works by Delivery Status</h3>
-          <p className="text-[11px]" style={{ color: '#505050' }}>
+        <div className="card p-5 flex flex-col gap-3 animate-slide-up" style={{ animationDelay: '100ms' }}>
+          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Works by Delivery Status</h3>
+          <p className="text-[11px]" style={{ color: 'var(--text-3)' }}>
             Current portfolio distribution — {totalWorks.toLocaleString()} works
           </p>
           {kpisLoading ? (
@@ -242,9 +246,9 @@ export default function ExecutiveOverview() {
         </div>
 
         {/* Zone Progress Grouped Bar */}
-        <div className="card p-5 flex flex-col gap-3">
-          <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Progress by Zone</h3>
-          <p className="text-[11px]" style={{ color: '#505050' }}>Avg physical progress — B&amp;R vs O&amp;M</p>
+        <div className="card p-5 flex flex-col gap-3 animate-slide-up" style={{ animationDelay: '180ms' }}>
+          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Progress by Zone</h3>
+          <p className="text-[11px]" style={{ color: 'var(--text-3)' }}>Avg physical progress — B&amp;R vs O&amp;M</p>
           {zonesLoading ? (
             <LoadingSkeleton />
           ) : (
@@ -262,10 +266,10 @@ export default function ExecutiveOverview() {
           )}
         </div>
 
-        {/* Expenditure by Fund Type (replaces Monthly Spend) */}
-        <div className="card p-5 flex flex-col gap-3">
-          <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>Expenditure by Fund Type (₹ Lacs)</h3>
-          <p className="text-[11px]" style={{ color: '#505050' }}>Disbursement distribution across funding sources</p>
+        {/* Expenditure by Fund Type */}
+        <div className="card p-5 flex flex-col gap-3 animate-slide-up" style={{ animationDelay: '260ms' }}>
+          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Expenditure by Fund Type (₹ Lacs)</h3>
+          <p className="text-[11px]" style={{ color: 'var(--text-3)' }}>Disbursement distribution across funding sources</p>
           {fundLoading ? (
             <LoadingSkeleton />
           ) : (
@@ -287,15 +291,15 @@ export default function ExecutiveOverview() {
       </div>
 
       {/* High Risk Works Table */}
-      <div className="card overflow-hidden">
+      <div className="card overflow-hidden animate-slide-up" style={{ animationDelay: '320ms' }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4"
-             style={{ borderBottom: '1px solid #1f1f1f', background: '#111111' }}>
+             style={{ borderBottom: '1px solid var(--glass-border)', background: 'var(--glass-bg)' }}>
           <div>
             <div className="flex items-center gap-3">
-              <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>High Risk Works Monitoring</h3>
+              <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>High Risk Works Monitoring</h3>
               <span className="badge badge-danger">{criticalList.length} Flagged</span>
             </div>
-            <p className="text-[11px] mt-0.5" style={{ color: '#505050' }}>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-3)' }}>
               Works with risk score ≥ 30 — sorted by severity
             </p>
           </div>
@@ -340,9 +344,9 @@ export default function ExecutiveOverview() {
               </thead>
               <tbody className="tbl-body">
                 {filtered.map(w => (
-                  <tr key={w.work_id}>
-                    <td><span className="font-semibold" style={{ color: '#a0a0a0' }}>{w.work_id}</span></td>
-                    <td style={{ color: '#c0c0c0', maxWidth: 280 }}>
+                  <tr key={w.work_id} className={(w.risk_score ?? 0) >= 60 ? 'row-danger' : ''}>
+                    <td><span className="font-semibold" style={{ color: 'var(--text-2)' }}>{w.work_id}</span></td>
+                    <td style={{ color: 'var(--text-1)', maxWidth: 280 }}>
                       <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {w.work_description || '—'}
                       </div>
