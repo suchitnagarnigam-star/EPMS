@@ -16,12 +16,14 @@ Sources:
 
 Data cleaning is partitioned between two layers:
 1. **Google Apps Script ETL (RAW → CLEAN)**:
+   - Generates Synthetic IDs (`OM-ROW-X`) for works missing Project IDs so they can be tracked without data loss.
    - Normalizes nature of work, statuses, and workflow stages.
    - Calculates financial progress percentage.
    - Identifies structural data quality issues (e.g. missing Project IDs).
    - Writes cleaned outputs to a secondary Google Staging Sheet.
 2. **FastAPI Ingestion Endpoint (CLEAN → DATABASE)**:
-   - Receives cleaned records and quarantines rows lacking project IDs.
+   - Reconciles Synthetic IDs (upgrades `OM-ROW-X` to real `MCL-XXXX` IDs when they are finally assigned).
+   - Receives cleaned records and quarantines rows lacking both project IDs and work descriptions.
    - Resolves dimension IDs for locations, executing agencies, funding sources, work types, and officers.
    - Computes overdue times and risk ratings.
 

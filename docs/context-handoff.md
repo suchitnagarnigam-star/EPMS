@@ -64,14 +64,16 @@ Main Tracker (B&R / O&M tabs)
 ### Phase 2 — Google Apps Script ETL (`code.gs`)
 - Reads B&R and O&M tabs from main tracker every 10 minutes.
 - **OVERWRITE mode**: staging tab is fully cleared and rewritten on each sync.
+- **Synthetic ID Generation**: Automatically assigns `OM-ROW-X` or `BR-ROW-X` to rows lacking a project ID so they can be tracked, marking them with `id_type: "SYNTHETIC"`.
 - Cleans, normalizes, and writes rows into the clean staging sheet.
 - Canonical maps for `nature_of_work`, `workflow_stage`, `delivery_status`.
-- Flags: `MISSING_PROJECT_ID`, `UNMAPPED_*`, `UNRESOLVED_LOCATION`, `MISSING_AGENCY`, `FIN_PROGRESS_ANOMALY`, `EXPENDITURE_OUTLIER`, `EXPENDITURE_CONVERTED_FROM_RUPEES`.
+- Flags: `MISSING_PROJECT_ID`, `SYNTHETIC_ID`, `UNMAPPED_*`, `UNRESOLVED_LOCATION`, `MISSING_AGENCY`, `FIN_PROGRESS_ANOMALY`, `EXPENDITURE_OUTLIER`, `EXPENDITURE_CONVERTED_FROM_RUPEES`.
 - **Expenditure guard**: handles cases where expenditure > tender cost * 2 by attempting auto-conversion.
 - Calls `pushToFastAPI()` once at end of `scheduledSync()`.
 
 ### Phase 3 — FastAPI Backend
 - Asyncpg pool with Neon SSL compatibility.
+- **Synthetic ID Reconciliation**: When a real project ID is assigned to a previously synthetic row, the backend seamlessly upgrades `OM-ROW-X` to the real ID without duplicating history.
 - `POST /sync/sheets`: resolves dimension FKs, computes `days_overdue` + `risk_score`, upserts via `record_hash` differential, inserts quality backlog.
 - `GET /kpis`, `GET /kpis/constituencies`, `GET /kpis/zones`, `GET /kpis/fund-distribution`, `GET /works`, `GET /contractors`, `GET /quality`, `GET /sync/status` endpoints built.
 
