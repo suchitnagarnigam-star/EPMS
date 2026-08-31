@@ -65,6 +65,8 @@ def parse_datetime_safe(v: Any) -> Optional[datetime]:
 class WorkSyncItem(BaseModel):
     # Identity
     work_id: str = Field(..., validation_alias=AliasChoices('work_id', 'project_id', '_project_id'))
+    id_type: Optional[str] = Field("REAL", validation_alias=AliasChoices('id_type'))
+    synthetic_row_ref: Optional[int] = Field(None, validation_alias=AliasChoices('synthetic_row_ref'))
     sr_no: Optional[int] = Field(None, validation_alias=AliasChoices('sr_no', 'Sr No', 'sr_number'))
     branch: str  # B&R / O&M
 
@@ -136,7 +138,7 @@ class WorkSyncItem(BaseModel):
     source_sheet: Optional[str] = Field(None, validation_alias=AliasChoices('source_sheet', '_source_sheet'))
     source_row: Optional[int] = Field(None, validation_alias=AliasChoices('source_row', '_source_row'))
     record_hash: Optional[str] = Field(None, validation_alias=AliasChoices('record_hash', '_record_hash'))
-    data_quality_flags: Optional[str] = Field(None, validation_alias=AliasChoices('data_quality_flags', '_data_quality_flags'))
+    data_quality_flags: Optional[str] = Field(None, validation_alias=AliasChoices('data_quality_flags', '_data_quality_flags', 'flags'))
     pipeline_version: Optional[str] = Field(None, validation_alias=AliasChoices('pipeline_version', '_pipeline_version'))
     staged_at: Optional[datetime] = Field(None, validation_alias=AliasChoices('staged_at', '_staged_at'))
 

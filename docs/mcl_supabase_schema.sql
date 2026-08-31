@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS fact_works (
 
   -- Identity
   work_id                VARCHAR(20) PRIMARY KEY,   -- Project ID from source
+  id_type                VARCHAR(20) DEFAULT 'REAL', -- "REAL" or "SYNTHETIC"
   sr_no                  INTEGER,
   branch                 VARCHAR(10) NOT NULL,       -- B&R / O&M (denormalized for fast filter)
 
