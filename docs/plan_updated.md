@@ -1,5 +1,5 @@
 # MCL Development Tracker — Updated Data Analysis & Implementation Plan
-> Last updated: August 27, 2026
+> Last updated: August 31, 2026
 
 ## 1. Project Overview & Scope
 
@@ -43,34 +43,34 @@ Instead of maintaining separate tables for B&R and O&M, we use a **Star Schema**
 - Schema tables, constraints, indexes, and triggers successfully deployed on Neon.
 
 ### Phase 2: Apps Script Stage Sync — COMPLETE ✅
-- apps scripts deployed in Google sheets to staging B&R and O&M rows.
+- Apps scripts deployed in Google sheets to staging B&R and O&M rows.
 
 ### Phase 3: FastAPI Backend Implementation — COMPLETE ✅
 - **Structure**: Configured with a dedicated virtual environment, standard requirements, lifespan asyncpg pool, and CORS headers.
 - **Sync Endpoints**: `POST /sync/sheets` built to resolve dimensions, calculate risk metrics, and handle upserts/skips atomically inside a transaction.
-- **KPIs Endpoint**: `GET /kpis` built to compute summaries and distributions.
+- **KPIs Endpoints**: `GET /kpis`, `GET /kpis/constituencies`, `GET /kpis/zones`, `GET /kpis/fund-distribution` built to compute summaries and distributions.
 - **Paginated List Endpoint**: `GET /works` built to join tables and filter records.
 - **Contractor Scorecard Endpoint**: `GET /contractors` built to rank contractor risks.
 - **Quality Endpoint**: `GET /quality` built to output quality statistics and parse error flags.
-- **Test Suite**: Verified end-to-end functionality using mock connections.
+- **Sync Status**: `GET /sync/status` built to fetch last synced timestamp.
+
+### Phase 4: Google Apps Script Webhook Trigger Integration — COMPLETE ✅
+- Scheduler configured in Google Apps Script to invoke `POST /sync/sheets`.
+- Differential hash-based sync running smoothly.
+
+### Phase 6: React Dashboard Development — COMPLETE ✅
+- Web interface fully connected to live FastAPI backend data, featuring tabs for:
+  - **Executive Overview**: High-level charts (KPIs, outlays, status funnels, fund distribution).
+  - **Contractor Scorecards**: Performance ratings and risk indexes.
+  - **Constituency Funds**: Outlay distributions by constituency.
+  - **Master Works Directory**: Paginated, filterable grid list.
+  - **Data Quality**: Validation pass rates, quarantined backlog items, and flag frequencies.
 
 ---
 
 ## 5. Next Steps & Action Plan
 
-### Phase 4: Google Apps Script Webhook Trigger Integration
-- Configure the scheduler in Google Apps Script to invoke `POST https://<backend-url>/sync/sheets` every 5 minutes.
-- Pass the staging payload containing `works` and `quality` arrays.
-
-### Phase 5: SASCI-MDF Road Pipeline Ingestion
+### Phase 5: SASCI-MDF Road Pipeline Ingestion — PENDING 🔄
 - Set up a separate ingestion route in FastAPI to process raw road rows from the SASCI-MDF tracker.
 - Write records to the `sasci_mdf_works` table.
-
-### Phase 6: React Dashboard Development
-- Build the web interface featuring tabs for:
-  - **Command Console**: High-level charts (KPIs, outlays, status funnels).
-  - **Contractor Scorecards**: Performance ratings and risk indexes.
-  - **Constituency & Ward Funds**: Outlay distributions by constituency.
-  - **Master Works Directory**: Paginated, filterable grid list.
-  - **MDF/SASCI Flagships**: Road progress tracking.
-  - **Data Quality Dashboard**: Quarantined backlog items.
+- Connect `FlagshipAgenda.tsx` to the new live endpoints and replace mock data.

@@ -1,6 +1,6 @@
 # MCL Development Project Tracker — System Architecture
 > Municipal Corporation Ludhiana | Analytics Platform Design
-> Last updated: August 27, 2026 — End of Backend Implementation
+> Last updated: August 31, 2026 — End of Frontend Dashboard Integration
 
 ---
 
@@ -15,29 +15,13 @@
 
 ### Why Master is reference-only
 
-Master is not an independent dataset. The Project IDs prove it:
-
-```
-B&R:    451 unique Project IDs
-O&M:    186 unique Project IDs
-        ─────────────────────
-Total:  637
-
-Master: 637 unique Project IDs  ← exact match
-```
-
-Master = B&R + O&M combined. Ingesting from Master would mean ingesting a derived view when we already have the underlying sources. Instead, Master is used to cross-validate the B&R + O&M population after ingestion.
+Master is not an independent dataset. Master = B&R + O&M combined. Ingesting from Master would mean ingesting a derived view when we already have the underlying sources. Instead, Master is used to cross-validate the B&R + O&M population after ingestion.
 
 ---
 
 ## 2. Rows ≠ Works
 
-```
-B&R:  717 rows  →  451 unique Project IDs
-O&M:  450 rows  →  186 unique Project IDs
-```
-
-Many rows exist without a Project ID. These must NOT be silently dropped or blindly ingested as fact_works records. Instead, every row is classified on ingest:
+Many rows in the source sheets exist without a Project ID. These must NOT be silently dropped or blindly ingested as fact_works records. Instead, every row is classified on ingest:
 
 ```
 Raw spreadsheet rows
@@ -48,7 +32,7 @@ Raw spreadsheet rows
                                 (flagged: MISSING_PROJECT_ID)
 ```
 
-This also gives us a dashboard metric: **"What % of source data is analytics-ready?"**
+This also provides a dashboard metric: **"What % of source data is analytics-ready?"**
 
 ---
 
@@ -83,7 +67,7 @@ Quarantine table storing rows that lack project IDs or fail validations, includi
 
 ## 4. Entire Codebase Architecture
 
-The backend is built as a modular FastAPI web service utilizing **raw asyncpg** for high-performance async query execution.
+The project consists of a React/Vite Frontend and a modular FastAPI Backend utilizing **raw asyncpg** for high-performance async query execution.
 
 ### Backend Structure
 ```
@@ -94,58 +78,29 @@ Backend/
 ├── database.py           # Connection pool manager and dependency injector
 ├── models.py             # Pydantic schema validation & date parsing utilities
 ├── test_imports.py       # Import sanity verification script
-├── test_endpoints.py    # Mock database router unit tests
+├── test_endpoints.py     # Mock database router unit tests
 └── routers/              # Endpoint modules
     ├── __init__.py       # Package marker
-    ├── sync.py           # Sheets ingestion & dimension resolution (/sync/sheets)
-    ├── kpis.py           # Dashboard aggregate statistics (/kpis)
+    ├── sync.py           # Sheets ingestion & dimension resolution (/sync/sheets), Sync status (/sync/status)
+    ├── kpis.py           # Dashboard aggregates (/kpis, /kpis/constituencies, /kpis/zones, /kpis/fund-distribution)
     ├── works.py          # Paginated works queries with dimension joins (/works)
     ├── contractor.py     # Contractor scorecard outlays & risk scores (/contractors)
     └── data_quality.py   # Backlog lists & quality flags frequency (/quality)
 ```
 
-### Module Breakdown
-
-#### A. Database Initialization (`database.py`)
-Exposes database pool acquisition and dependencies.
-- **Neon SSL Compatibility**: Cleans incoming `DATABASE_URL` by removing standard query parameters (like `sslmode=require`) that asyncpg does not natively support inside URIs. Instead, it injects `ssl="require"` directly into `asyncpg.create_pool` keyword arguments if `sslmode` or `neon.tech` is present.
-- **Dependency `get_db`**: Yields a connection from the pool registered in `FastAPI.state.db_pool` on a per-request basis.
-
-#### B. Pydantic Models & Caching (`models.py`)
-- **Flexible Field Alias Matching**: Leverages `AliasChoices` to allow incoming payloads to map columns with leading underscores (e.g. `_staged_at`, `_record_hash`) or natural names seamlessly.
-- **Robust Parsers**: Exposes `parse_date_safe` and `parse_datetime_safe` to parse dates formatted in ISO formats or typical Indian `DD/MM/YYYY` layouts while converting dash/N/A string values to `None`.
-
-#### C. Endpoints & Business Logic
-
-1. **Sheets Synchronizer (`routers/sync.py`)**
-   - Exposes `POST /sync/sheets`.
-   - Executes inside a SQL transaction block: `async with conn.transaction():`.
-   - Resolves dimension foreign keys by running `INSERT ... ON CONFLICT DO NOTHING` followed by `SELECT` (utilizing `IS NOT DISTINCT FROM` comparison to safely match `NULL` columns).
-   - Computes `days_overdue` (`today - scheduled_end_date` if not Completed) and `risk_score` (`days_overdue * 0.5 + 20` if a progress anomaly is flagged) directly in Python.
-   - Upserts `fact_works` using `ON CONFLICT (work_id) DO UPDATE ... WHERE fact_works.record_hash IS DISTINCT FROM EXCLUDED.record_hash`. Returns `work_id` only if changes were made, enabling count tracking of `upserted` vs `skipped` rows.
-   - Inserts failed/flagged rows to `data_quality`, serializing complete rows to `raw_json` using Pydantic's native `.model_dump_json()`.
-
-2. **Dashboard KPIs (`routers/kpis.py`)**
-   - Exposes `GET /kpis`.
-   - Computes aggregated counters (`total_works`, `total_est_cost_lacs`, `total_tender_cost_lacs`, `total_expenditure_lacs`, `avg_financial_progress_pct`, `anomaly_count`).
-   - Retrieves count distributions grouped by branch, delivery status, and workflow stage. Supports an optional `branch` query filter.
-
-3. **Works Directory (`routers/works.py`)**
-   - Exposes `GET /works`.
-   - Returns a paginated list of project rows (`total`, `page`, `page_size`, `results`) joining `dim_location`, `dim_agency`, `dim_work_type`, `dim_officer`, and `dim_fund`.
-   - Builds SQL conditions dynamically based on filters (`branch`, `zone`, `constituency`, `delivery_status`, `workflow_stage`, `search`).
-   - Standardizes Python `Decimal` outputs to float values to avoid JSON serialization failures.
-
-4. **Contractor scorecards (`routers/contractor.py`)**
-   - Exposes `GET /contractors`.
-   - Summarizes contractor stats (`total_works`, `completed`, `delayed`, `in_progress`, `avg_financial_progress_pct`, `total_expenditure_lacs`, `risk_score_avg`).
-   - Joins `dim_agency` and groups by contractor, ordering by `risk_score_avg DESC` by default.
-
-5. **Data Quality Backlog (`routers/data_quality.py`)**
-   - Exposes `GET /quality`.
-   - Computes overall counts and analytics-ready percentages.
-   - Builds a frequency mapping of quality issue flags directly in PostgreSQL using `regexp_split_to_table(flags, '\|')` to split pipe-separated flag strings.
-   - Serves paginated backlog details from the `data_quality` table.
+### Frontend Structure
+```
+Frontend/
+├── .env                  # Environment configurations (VITE_API_URL)
+├── package.json          # Node dependencies
+├── vite.config.ts        # Vite build config & local API proxy
+├── src/
+│   ├── App.tsx           # Router and Theme provider
+│   ├── components/       # Reusable UI elements (Layout, LoadingSkeleton, SyncStatus, etc.)
+│   ├── context/          # State providers (AuthContext, ThemeContext)
+│   ├── data/             # API clients and Typed hooks (api.ts, useApi.ts)
+│   └── pages/            # View components (ExecutiveOverview, ContractorMatrix, MasterWorksDirectory, etc.)
+```
 
 ---
 
@@ -172,13 +127,16 @@ Exposes database pool acquisition and dependencies.
                    ▼
 ┌──────────────────────────────────────┐
 │     Neon PostgreSQL Star Schema      │
+└──────────────────┬───────────────────┘
+                   │ REST API (/kpis, /works, etc.)
+                   ▼
+┌──────────────────────────────────────┐
+│       React / Vite Frontend          │
 └──────────────────────────────────────┘
 ```
 
 ---
 
-## 6. Verification and Testing
+## 6. Concurrent Execution
 
-The backend includes test scripts to run checks without a live database dependency:
-- **`test_imports.py`**: Validates syntactic correctness, dependency imports, and FastAPI startup configurations.
-- **`test_endpoints.py`**: Mocks database queries and transaction states, asserting correct formats, defaults, conversions, and calculations for all routers.
+For local development, the root directory orchestrates both servers using the `concurrently` package. Running `npm run dev:full` at the root level concurrently spawns the Vite dev server and the Uvicorn ASGI server.
