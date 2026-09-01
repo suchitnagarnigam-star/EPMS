@@ -74,31 +74,31 @@
   --text-4:          #a8a29e; /* Stone 400 */
   --chart-text:      #57534e; /* Stone 600 for Recharts ticks */
 
-  --accent:          #2563eb;
-  --accent-dim:      #e8eefc;
-  --accent-hover:    #1d4ed8;
-  --accent-text:     #1d4ed8;
+  --accent:          #3551e0; /* Warm royal indigo */
+  --accent-dim:      #eef2ff;
+  --accent-hover:    #253cb5;
+  --accent-text:     #2840c8;
 
-  --success:         #059669;
-  --success-bg:      #e6f7f0;
-  --warn:            #d97706;
-  --warn-bg:         #fef7e6;
-  --danger:          #dc2626;
-  --danger-bg:       #fde8e8;
-  --info:            #0284c7;
-  --info-bg:         #e6f4fb;
+  --success:         #047857; /* Warm deep emerald */
+  --success-bg:      #e6f4ed;
+  --warn:            #d97706; /* Warm amber gold */
+  --warn-bg:         #fef3c7;
+  --danger:          #b91c1c; /* Warm crimson red */
+  --danger-bg:       #fee2e2;
+  --info:            #0369a1; /* Deep warm sky */
+  --info-bg:         #e0f2fe;
 
   --input-bg:        #ffffff;
-  --input-border:    #d6cfc4;
-  --input-focus:     #2563eb;
+  --input-border:    #d8d0c5;
+  --input-focus:     #3551e0;
   --select-bg:       #ffffff;
 
-  --scrollbar:       #d6cfc4;
+  --scrollbar:       #d8d0c5;
   --scrollbar-hover: #a8a29e;
 
-  --sidebar-bg:      #faf8f4;
+  --sidebar-bg:      #f7f4ed;
   --topbar-bg:       #faf8f4;
-  --tbl-head-bg:     #eee7dc;
+  --tbl-head-bg:     #eae3d5;
   --tbl-row-border:  #e2dcd2;
 
   --glass-bg:        #ffffff;
@@ -106,8 +106,8 @@
   --glass-shadow:    0 1px 3px 0 rgb(60 50 40 / 0.08), 0 1px 2px -1px rgb(60 50 40 / 0.08);
   --glass-shadow-lg: 0 10px 15px -3px rgb(60 50 40 / 0.1), 0 4px 6px -4px rgb(60 50 40 / 0.08);
 
-  --mesh-a: rgba(217, 119, 6, 0.06);
-  --mesh-b: rgba(37, 99, 235, 0.04);
+  --mesh-a: rgba(217, 119, 6, 0.08);
+  --mesh-b: rgba(59, 82, 212, 0.05);
 }
 
 /* Fallback override for inline legacy hardcoded dark styles in Light Mode */

@@ -28,18 +28,28 @@ The browser subagent verified all views, dropdown filters, refetch handlers, and
 
 ## Changes Deployed
 
-### 1. Backend Modifications (FastAPI)
-- **`GET /kpis/constituencies`**: Computes constituency aggregates (total/B&R/O&M count, est/tender cost, expenditure, completed, and risk count). Handles optional `branch` query filter.
-- **`GET /kpis/zones`**: Averages physical and financial progress (filtering anomalies ≤ 100) grouped by `zone` and `branch`.
-- **`GET /sync/status`**: Returns database statistics (`total_works` and `last_synced_at`) based on the latest facts updated.
-- **`GET /kpis`**: Augmented with `by_fund_type` subquery returning funding breakdown.
+### 3. Recent Sprints & Architecture Enhancements (Sprints 1–3)
 
-### 2. Frontend Infrastructure & Components
-- **`SyncStatus.tsx`**: Renders live header badge showing database synchronization info.
-- **`LoadingSkeleton.tsx`**: Renders smooth animate-pulse indicators during fetch states.
-- **`ErrorState.tsx`**: Renders error messages with retry options, providing explicit warm-up hints if Render free tier is waking up.
-- **`DataQuality.tsx`**: A new sidebar dashboard displaying pass rates, issue frequencies, and detailed quarantined rows register with pagination.
-- **`Layout.tsx` & `App.tsx`**: Routed `/quality` and connected `SyncStatus` to the header topbar and sidebar footer.
-- **`api.ts`**: Upgraded fetch helpers to map and align with all backend aggregation structures.
-- **`ConstituencyFunds.tsx` & `MasterWorksDirectory.tsx`**: Upgraded with dynamic select options and branch filter dropdowns.
-- **`StageBadge.tsx`**: Updated to support both mock and backend delivery status keys.
+#### Methodology Registry & React Portal Tooltips
+- Centralized metric definitions registry in `Frontend/src/data/methodology.ts`.
+- Refactored `MethodologyTooltip.tsx` to render floating popovers via **React Portal (`createPortal`)** directly to `document.body`.
+- Dynamically calculates viewport coordinates using `getBoundingClientRect()` with `scroll` and `resize` event listeners, making tooltips immune to parent card `overflow: hidden` boundaries.
+
+#### Master Works Directory Sorting Controls
+- Added interactive sorting options (Risk Score, Est. Cost, Days Overdue, Physical Progress).
+- Integrated standardized methodology tooltips in table header columns.
+
+#### Date Cleaning & Risk Score Sanitation
+- Enhanced `parse_date_safe` in `Backend/models.py` with regex string extraction for prefixed dates (e.g. `2655 11/02/2026`).
+- Implemented a **Year ≥ 2000 guard** in `parse_date_safe` to reject corrupt Excel serial numbers (e.g., `10/01/1900`), preventing artificial risk score spikes (MCL-0357).
+
+#### Admin Email Access Management (Profile Page)
+- Added `dashboard_users` table in Neon PostgreSQL.
+- Implemented FastAPI CRUD REST endpoints (`/admin/users`) in `Backend/routers/admin.py`.
+- Built `ProfilePage.tsx` interface allowing logged-in admins to manage email access lists.
+
+#### Executive Overview Filter Sync
+- Wrapped all dashboard API calls (`kpis`, `zones`, `constituencies`, `fund-distribution`) with `buildParams()` guard for uniform filter application.
+
+#### Warm Beige Light Theme Palette
+- Redesigned Light Theme (`[data-theme="light"]`) in `Frontend/src/index.css` with a warm beige stone backdrop (`#f5f2eb`), rich stone typography (`#1c1917`), warm indigo accents (`#3551e0`), and warm amber/emerald/crimson status badges.

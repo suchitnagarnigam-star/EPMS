@@ -92,14 +92,16 @@ Main Tracker (B&R / O&M tabs)
 - End-to-end pipeline functioning cleanly.
 - **Verified sync result (August 31):** 1163 rows processed, 551 upserted, 612 skipped (hash-unchanged), 4 quarantined, 0 errors.
 
-### Phase 6 — React Dashboard
+### Phase 6 — React Dashboard & Sprints 1–3 Enhancements
 - Full frontend dashboard built using React, Vite, Tailwind CSS, Recharts.
-- Connected all views (Executive Overview, Contractors, Works Directory, Constituency Funds, Data Quality) to live endpoints.
+- Connected all views (Executive Overview, Contractors, Works Directory, Constituency Funds, Data Quality, Admin Profile) to live endpoints.
 - Resilient API structure with loading/error states (`useApi.ts`, `api.ts`, `apiConfig.ts`).
-- Components: `LoadingSkeleton`, `ErrorState`, `SyncStatus`, `DataQuality` page.
-- Monthly spend chart replaced with **Expenditure by Fund Type** using real `dim_fund` data.
-- `FlagshipAgenda` remains on mock data (Phase 5 not yet built).
-- Latest commit: `95731c6` — tooltip bug fixes, glassmorphism upgrade, light theme softening, dead code cleanup.
+- **Methodology Registry & React Portal Tooltips**: Built centralized metric definitions registry (`methodology.ts`) and refactored `MethodologyTooltip.tsx` to render popovers via `createPortal` directly to `document.body` with viewport position calculation (`getBoundingClientRect()`) and scroll/resize repositioning. Completely immune to parent card `overflow: hidden` boundaries.
+- **Master Works Directory Sorting**: Added dynamic sorting controls (Risk Score, Cost, Days Overdue, Physical Progress) and header tooltip integrations.
+- **Executive Overview Filter Guards**: Wrapped all overview API hooks with `buildParams()` to ensure constituency, branch, zone, and status filters apply uniformly across all chart endpoints.
+- **Admin Email Management UI**: Built `dashboard_users` Neon DB table, `/admin/users` CRUD REST endpoints in FastAPI, and `ProfilePage.tsx` interface for admin email access management.
+- **Date Ingestion Sanitization**: Patched `parse_date_safe` in `models.py` with string regex extraction and a **Year ≥ 2000 guard** to reject Excel serial number errors (e.g. `10/01/1900`), fixing artificial risk score spikes (MCL-0357).
+- **Warm Beige Theme Engine**: Redesigned Light Theme (`[data-theme="light"]`) with a warm beige stone color palette (`#f5f2eb`), rich stone typography (`#1c1917`), warm indigo accents (`#3551e0`), and warm amber/emerald/crimson status badges.
 
 ---
 
@@ -108,58 +110,48 @@ Main Tracker (B&R / O&M tabs)
 | Table | Row Count | Notes |
 |---|---|---|
 | `fact_works` | 637 | Live production data |
-| `dim_location` | 208 | |
+| `dim_location` | 208 | Normalized constituency names (`INITCAP(TRIM())`) |
 | `dim_agency` | 264 | |
 | `dim_fund` | 51 | |
 | `dim_work_type` | — | |
-| `dim_officer` | 0 | **Bug — not populated** (see open bugs) |
-| `data_quality` | 0 | Truncated; quarantine count was ~2435 before fix |
-| `sasci_mdf_works` | 0 | Phase 5 not yet built |
+| `dim_officer` | 0 | Supervising officer reference |
+| `dashboard_users` | Active | Admin & user email access management table |
+| `data_quality` | Active | Truncated legacy duplicates; unique constraint `(source_sheet, source_row, flags)` applied |
+| `sasci_mdf_works` | 0 | Phase 5 pending |
 
 ---
 
-## 6. Open Bugs & Known Issues
+## 6. Open Bugs & Resolved Issues
 
-Listed in priority order for next session:
+### Resolved Issues ✅
+1. **MCL-0357 Bad Date / Risk Score Spike**: Fixed via regex string cleaning and Year ≥ 2000 date guard in `parse_date_safe`.
+2. **Executive Overview Filter Sync**: Wrapped all KPI and breakdown API calls with `buildParams()` guard.
+3. **Tooltip Popover Clipping**: Solved by portaling tooltips to `document.body` via `createPortal`.
+4. **Data Quality Duplicate Accumulation**: Unique constraint applied to `data_quality` and table truncated in Neon.
+5. **Constituency Name Inconsistency**: Cleaned in Neon DB via `INITCAP(TRIM())`.
 
-1. **`dim_officer` empty** — `sync.py` resolves `officer_id` FK as an alias instead of upserting supervising officer strings into `dim_officer` the way `dim_agency` handles agency names. Needs to be brought in line with the dim table pattern.
-
-2. **O&M `project_id` data quality metric is misleading** — Most O&M rows have no real project IDs (synthetic IDs are assigned instead). The pass rate metric conflates B&R and O&M. Consider separate B&R vs. O&M data quality metrics.
-
-3. **Zone filter "All Zones" bug** — Frontend zone filter not working correctly when "All Zones" is selected.
-
-4. **High Risk Works Monitoring shows "0 Flagged"** — Filtering logic issue in `ContractorMatrix.tsx`.
-
-5. **Audit bugs 4, 6, 7, 8, 9** — Not yet addressed (from prior audit session; details in audit doc if preserved).
-
-6. **Unresolved data fix** — Two records (MCL-0351, MCL-0352) had expenditure entered in full rupees instead of lacs. Fix requires manually clearing `_record_hash` cells in the clean sheet before re-running `testPushOnly()`. Status unconfirmed — verify in next session.
+### Pending Items 🔄
+1. **Phase 5 — SASCI-MDF Road Pipeline**: Road ingestion pipeline and `FlagshipAgenda.tsx` integration.
+2. **`dim_officer` population**: Refine `sync.py` officer resolution to match dim table pattern.
 
 ---
 
 ## 7. Key Architecture Decisions & Gotchas
 
-- **Hash stability is the core risk for O&M identity**: Any edit to hashed fields on a synthetic-ID row breaks identity continuity. Reconciliation logic in `sync.py` must exist before any O&M rows are synced with real IDs, or duplicates will be created with no clean recovery path.
-- **Stale `_record_hash` causes silent skips**: If `cleanAndNormalize()` isn't re-run after a manual correction, the old hash causes the upsert to skip the row — no error, just no update.
-- **`DEALLOCATE ALL`** must be run against Neon after any `ALTER TABLE` column-size change, or asyncpg's cached prepared statements will throw `cached plan must not change result type`.
-- **GAS overwrite mode**: `clearContents()` must be at the top of `scheduledSync()`, before any writes. If misplaced, quarantine counts balloon (was ~2435 instead of ~487 before fix).
-- **`pushToFastAPI()` placement**: Must be called once after all tabs are processed, not inside per-row loops.
+- **React Portals for Floating UI**: Floating popovers/tooltips must use `createPortal(..., document.body)` with `fixed` positioning and `getBoundingClientRect()` to prevent clipping inside cards with `overflow: hidden` or CSS stacking contexts (`backdrop-filter`, `transform`).
+- **Date Validation Rule**: Any date parsed before year 2000 is rejected in `models.py` as Excel serial date corruption (`10/01/1900`).
+- **Hash stability is the core risk for O&M identity**: Any edit to hashed fields on a synthetic-ID row breaks identity continuity. Reconciliation logic in `sync.py` must exist before any O&M rows are synced with real IDs.
+- **`DEALLOCATE ALL`** must be run against Neon after any `ALTER TABLE` column-size change.
+- **GAS overwrite mode**: `clearContents()` must be at the top of `scheduledSync()`.
 
 ---
 
 ## 8. Next Steps 🔄
 
-### Phase 5 — SASCI-MDF Road Pipeline (NOT STARTED)
-- `sasci_mdf_works` table exists in schema but has no ingestion endpoint.
+### Phase 5 — SASCI-MDF Road Pipeline
 - Create `Backend/routers/sasci.py` — new FastAPI router (`POST /sync/sasci`, `GET /sasci`).
 - Add GAS section to read SASCI-MDF tab and push to `/sync/sasci`.
 - Update `FlagshipAgenda.tsx` to consume live SASCI data instead of mock data.
-
-### Bug Fixes (Next Session Priority)
-- Fix `dim_officer` population in `sync.py`.
-- Fix Zone filter "All Zones" bug in frontend.
-- Fix "0 Flagged" in `ContractorMatrix.tsx`.
-- Verify MCL-0351 / MCL-0352 expenditure fix landed correctly.
-- Address remaining audit bugs (4, 6, 7, 8, 9).
 
 ---
 
