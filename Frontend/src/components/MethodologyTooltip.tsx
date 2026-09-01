@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Info } from 'lucide-react';
 import { methodology } from '../data/methodology';
 
@@ -10,23 +11,14 @@ interface Props {
 export default function MethodologyTooltip({ metric, className = '' }: Props) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-  const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const entry = methodology[metric];
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const updatePosition = () => {
-    if (ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      const popoverWidth = 288; // 72 * 4 = 288px (w-72)
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const popoverWidth = 288; // w-72 = 288px
       const popoverHeight = 180;
 
       let top = rect.top - popoverHeight - 8;
@@ -46,6 +38,35 @@ export default function MethodologyTooltip({ metric, className = '' }: Props) {
     }
   };
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        buttonRef.current && !buttonRef.current.contains(event.target as Node) &&
+        popoverRef.current && !popoverRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    function handleScrollOrResize() {
+      if (open) {
+        updatePosition();
+      }
+    }
+
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [open]);
+
   const handleOpen = () => {
     updatePosition();
     setOpen(true);
@@ -54,8 +75,9 @@ export default function MethodologyTooltip({ metric, className = '' }: Props) {
   if (!entry) return null;
 
   return (
-    <div ref={ref} className={`inline-flex items-center ${className}`}>
+    <div className={`inline-flex items-center ${className}`}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => { if (!open) handleOpen(); else setOpen(false); }}
         onMouseEnter={handleOpen}
@@ -66,9 +88,10 @@ export default function MethodologyTooltip({ metric, className = '' }: Props) {
         <Info size={13} strokeWidth={2} />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          className="fixed z-[9999] w-72 p-3 rounded-xl text-left shadow-2xl pointer-events-none transition-all animate-fade-in"
+          ref={popoverRef}
+          className="fixed z-[99999] w-72 p-3 rounded-xl text-left shadow-2xl pointer-events-none transition-opacity duration-150"
           style={{
             top: `${coords.top}px`,
             left: `${coords.left}px`,
@@ -98,7 +121,8 @@ export default function MethodologyTooltip({ metric, className = '' }: Props) {
               <p className="italic text-[10.5px]" style={{ color: 'var(--text-3)' }}>{entry.notes}</p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
