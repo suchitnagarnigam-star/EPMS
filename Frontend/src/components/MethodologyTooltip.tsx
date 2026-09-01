@@ -9,7 +9,7 @@ interface Props {
 
 export default function MethodologyTooltip({ metric, className = '' }: Props) {
   const [open, setOpen] = useState(false);
-  const [placeBelow, setPlaceBelow] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
   const entry = methodology[metric];
 
@@ -23,18 +23,38 @@ export default function MethodologyTooltip({ metric, className = '' }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleOpen = () => {
+  const updatePosition = () => {
     if (ref.current) {
       const rect = ref.current.getBoundingClientRect();
-      setPlaceBelow(rect.top < 200);
+      const popoverWidth = 288; // 72 * 4 = 288px (w-72)
+      const popoverHeight = 180;
+
+      let top = rect.top - popoverHeight - 8;
+      // If icon is near top of screen (less than 200px from top), position popover below icon
+      if (rect.top < 200) {
+        top = rect.bottom + 8;
+      }
+
+      // Bound left position within viewport horizontally
+      let left = rect.left + rect.width / 2 - popoverWidth / 2;
+      if (left < 12) left = 12;
+      if (left + popoverWidth > window.innerWidth - 12) {
+        left = window.innerWidth - popoverWidth - 12;
+      }
+
+      setCoords({ top, left });
     }
+  };
+
+  const handleOpen = () => {
+    updatePosition();
     setOpen(true);
   };
 
   if (!entry) return null;
 
   return (
-    <div ref={ref} className={`relative inline-flex items-center ${className}`}>
+    <div ref={ref} className={`inline-flex items-center ${className}`}>
       <button
         type="button"
         onClick={() => { if (!open) handleOpen(); else setOpen(false); }}
@@ -48,14 +68,15 @@ export default function MethodologyTooltip({ metric, className = '' }: Props) {
 
       {open && (
         <div
-          className={`absolute z-50 left-1/2 -translate-x-1/2 w-72 p-3 rounded-xl text-left shadow-xl pointer-events-none transition-all animate-fade-in ${
-            placeBelow ? 'top-full mt-2' : 'bottom-full mb-2'
-          }`}
+          className="fixed z-[9999] w-72 p-3 rounded-xl text-left shadow-2xl pointer-events-none transition-all animate-fade-in"
           style={{
+            top: `${coords.top}px`,
+            left: `${coords.left}px`,
             background: 'var(--card)',
             border: '1px solid var(--glass-border)',
             backdropFilter: 'blur(16px)',
             color: 'var(--text-1)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
           }}
         >
           <div className="flex items-center gap-1.5 border-b pb-1.5 mb-2" style={{ borderColor: 'var(--glass-border)' }}>
