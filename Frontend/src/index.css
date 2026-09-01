@@ -58,56 +58,56 @@
   --mesh-b: rgba(52, 211, 153, 0.08);
 }
 
-/* ── LIGHT THEME (SOLID SURFACES & CRISP CONTRAST) ── */
+/* ── LIGHT THEME (WARM BEIGE & RICH STONE CONTRAST) ── */
 [data-theme="light"] {
-  --bg:              #f8fafc; /* Slate 50 clean backdrop */
-  --surface:         #ffffff;
+  --bg:              #f5f2eb; /* Warm beige backdrop */
+  --surface:         #fcfbf9;
   --card:            #ffffff;
-  --card-alt:        #f1f5f9;
-  --border:          #e2e8f0;
-  --border-subtle:   #f1f5f9;
-  --hover:           #f1f5f9;
+  --card-alt:        #eee8dc;
+  --border:          #e2dcd2;
+  --border-subtle:   #eae4d9;
+  --hover:           #eee7db;
 
-  --text-1:          #0f172a; /* Slate 900 */
-  --text-2:          #334155; /* Slate 700 */
-  --text-3:          #64748b; /* Slate 500 */
-  --text-4:          #94a3b8; /* Slate 400 */
-  --chart-text:      #374151; /* Gray 700 for Recharts ticks */
+  --text-1:          #1c1917; /* Stone 900 warm dark */
+  --text-2:          #44403c; /* Stone 700 */
+  --text-3:          #78716c; /* Stone 500 */
+  --text-4:          #a8a29e; /* Stone 400 */
+  --chart-text:      #57534e; /* Stone 600 for Recharts ticks */
 
   --accent:          #2563eb;
-  --accent-dim:      #eff6ff;
+  --accent-dim:      #e8eefc;
   --accent-hover:    #1d4ed8;
   --accent-text:     #1d4ed8;
 
   --success:         #059669;
-  --success-bg:      #ecfdf5;
+  --success-bg:      #e6f7f0;
   --warn:            #d97706;
-  --warn-bg:         #fffbeb;
+  --warn-bg:         #fef7e6;
   --danger:          #dc2626;
-  --danger-bg:       #fef2f2;
+  --danger-bg:       #fde8e8;
   --info:            #0284c7;
-  --info-bg:         #f0f9ff;
+  --info-bg:         #e6f4fb;
 
   --input-bg:        #ffffff;
-  --input-border:    #cbd5e1;
+  --input-border:    #d6cfc4;
   --input-focus:     #2563eb;
   --select-bg:       #ffffff;
 
-  --scrollbar:       #cbd5e1;
-  --scrollbar-hover: #94a3b8;
+  --scrollbar:       #d6cfc4;
+  --scrollbar-hover: #a8a29e;
 
-  --sidebar-bg:      #ffffff;
-  --topbar-bg:       #ffffff;
-  --tbl-head-bg:     #f8fafc;
-  --tbl-row-border:  #e2e8f0;
+  --sidebar-bg:      #faf8f4;
+  --topbar-bg:       #faf8f4;
+  --tbl-head-bg:     #eee7dc;
+  --tbl-row-border:  #e2dcd2;
 
   --glass-bg:        #ffffff;
-  --glass-border:    #e2e8f0;
-  --glass-shadow:    0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --glass-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --glass-border:    #e2dcd2;
+  --glass-shadow:    0 1px 3px 0 rgb(60 50 40 / 0.08), 0 1px 2px -1px rgb(60 50 40 / 0.08);
+  --glass-shadow-lg: 0 10px 15px -3px rgb(60 50 40 / 0.1), 0 4px 6px -4px rgb(60 50 40 / 0.08);
 
-  --mesh-a: rgba(37, 99, 235, 0.05);
-  --mesh-b: rgba(16, 185, 129, 0.04);
+  --mesh-a: rgba(217, 119, 6, 0.06);
+  --mesh-b: rgba(37, 99, 235, 0.04);
 }
 
 /* Fallback override for inline legacy hardcoded dark styles in Light Mode */
