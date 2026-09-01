@@ -272,6 +272,7 @@ svg, path, rect, circle, ellipse, line, polyline, polygon {
 /* Stat Card Glow Effect */
 .stat-glow {
   position: relative;
+  overflow: hidden;
 }
 .stat-glow::before {
   content: '';
@@ -279,8 +280,6 @@ svg, path, rect, circle, ellipse, line, polyline, polygon {
   top: 0; left: 0; right: 0; height: 2px;
   background: currentColor;
   opacity: 0.8;
-  border-top-left-radius: 14px;
-  border-top-right-radius: 14px;
 }
 
 /* Badge */
