@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncpg
 
 from database import DATABASE_URL, get_pool_params
-from routers import sync, kpis, works, contractor, data_quality
+from routers import sync, kpis, works, contractor, data_quality, admin
 
 # Configure logging
 logging.basicConfig(
@@ -61,6 +61,7 @@ app.include_router(kpis.router)
 app.include_router(works.router)
 app.include_router(contractor.router)
 app.include_router(data_quality.router)
+app.include_router(admin.router)
 
 @app.get("/health")
 async def health_check():

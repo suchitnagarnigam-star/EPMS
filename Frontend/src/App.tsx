@@ -10,6 +10,7 @@ import ConstituencyFunds     from './pages/ConstituencyFunds';
 import MasterWorksDirectory  from './pages/MasterWorksDirectory';
 import FlagshipAgenda        from './pages/FlagshipAgenda';
 import DataQuality           from './pages/DataQuality';
+import ProfilePage           from './pages/ProfilePage';
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
                 <Route path="works"             element={<MasterWorksDirectory />} />
                 <Route path="flagship"          element={<FlagshipAgenda />}       />
                 <Route path="quality"           element={<DataQuality />}          />
+                <Route path="profile"           element={<ProfilePage />}          />
               </Route>
             </Route>
 

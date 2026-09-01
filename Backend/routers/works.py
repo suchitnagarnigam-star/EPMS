@@ -24,7 +24,10 @@ async def get_works(
     constituency: Optional[str] = None,
     delivery_status: Optional[str] = None,
     workflow_stage: Optional[str] = None,
+    risk_score_min: Optional[float] = None,
     search: Optional[str] = None,
+    sort_by: Optional[str] = "risk_score",
+    sort_order: Optional[str] = "desc",
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     conn: Connection = Depends(get_db)
@@ -44,9 +47,9 @@ async def get_works(
         params.append(zone)
         conditions.append(f"L.zone = ${len(params)}")
 
-    if constituency:
-        params.append(constituency)
-        conditions.append(f"L.constituency = ${len(params)}")
+    if constituency and constituency.strip() and constituency.lower() != 'all':
+        params.append(constituency.strip())
+        conditions.append(f"INITCAP(TRIM(L.constituency)) = INITCAP(TRIM(${len(params)}))")
 
     if delivery_status:
         params.append(delivery_status)
@@ -55,6 +58,10 @@ async def get_works(
     if workflow_stage:
         params.append(workflow_stage)
         conditions.append(f"F.workflow_stage = ${len(params)}")
+
+    if risk_score_min is not None:
+        params.append(risk_score_min)
+        conditions.append(f"F.risk_score >= ${len(params)}")
 
     if search:
         params.append(f"%{search}%")
@@ -65,6 +72,18 @@ async def get_works(
         )
 
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
+
+    valid_sorts = {
+        "risk_score": "F.risk_score",
+        "est_cost_lacs": "F.est_cost_lacs",
+        "tender_cost_lacs": "F.tender_cost_lacs",
+        "expenditure_lacs": "F.expenditure_lacs",
+        "physical_progress_pct": "F.physical_progress_pct",
+        "work_id": "F.work_id",
+    }
+    sort_col = valid_sorts.get(sort_by or "risk_score", "F.risk_score")
+    order_dir = "ASC" if (sort_order or "").lower() == "asc" else "DESC"
+    order_clause = f"ORDER BY {sort_col} {order_dir} NULLS LAST, F.work_id ASC"
 
     # 1. Total Count Query
     count_query = f"""
@@ -84,10 +103,19 @@ async def get_works(
             F.workflow_stage, F.delivery_status, F.aa_approved, F.ts_approved, F.ts_accorded_by,
             F.resolution_no_date, F.work_order_no_date, F.tender_float_date, F.tender_end_date, F.tech_eval_done, F.fin_eval_done,
             F.start_date, F.time_limit_months, F.scheduled_end_date, F.actual_completion_date,
-            F.physical_progress_pct, F.financial_progress_pct, F.fin_progress_anomaly,
+            CASE 
+              WHEN F.delivery_status ILIKE '%complet%' AND COALESCE(F.physical_progress_pct, 0) = 0
+              THEN 100.0
+              ELSE F.physical_progress_pct 
+            END AS physical_progress_pct,
+            CASE 
+              WHEN F.delivery_status ILIKE '%complet%' AND COALESCE(F.physical_progress_pct, 0) = 0
+              THEN true ELSE false 
+            END AS progress_inferred,
+            F.financial_progress_pct, F.fin_progress_anomaly,
             F.days_overdue, F.risk_score, F.issues_bottlenecks, F.remarks,
             F.source_sheet, F.source_row, F.record_hash, F.data_quality_flags, F.pipeline_version, F.staged_at,
-            L.zone, L.sub_zone, L.constituency, L.ward,
+            L.zone, L.sub_zone, INITCAP(TRIM(L.constituency)) AS constituency, L.ward,
             A.agency_name,
             W.nature_of_work,
             O.officer_name,
@@ -99,7 +127,7 @@ async def get_works(
         LEFT JOIN dim_officer O ON F.officer_id = O.officer_id
         LEFT JOIN dim_fund FD ON F.fund_id = FD.fund_id
         WHERE {where_clause}
-        ORDER BY F.work_id ASC
+        {order_clause}
         LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}
     """
 
@@ -115,3 +143,4 @@ async def get_works(
         "page_size": page_size,
         "results": results
     }
+

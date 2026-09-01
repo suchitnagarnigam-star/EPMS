@@ -92,8 +92,10 @@ async def test_contractor_router():
             "delayed": 1,
             "in_progress": 2,
             "avg_financial_progress_pct": Decimal("75.50"),
+            "avg_physical_progress_pct": Decimal("80.00"),
             "total_expenditure_lacs": Decimal("500.00"),
-            "risk_score_avg": Decimal("15.20")
+            "risk_score_avg": Decimal("15.20"),
+            "max_risk_score": Decimal("25.00")
         })
     ]
     
@@ -101,6 +103,7 @@ async def test_contractor_router():
     assert len(res) == 1
     assert res[0]["agency_name"] == "ABC Corp"
     assert res[0]["risk_score_avg"] == 15.20
+    assert res[0]["health_rating"] == "Moderate"
     print("[OK] Contractors Router verified successfully")
 
 async def test_data_quality_router():
@@ -192,10 +195,10 @@ async def test_sync_router():
     # Run sync
     res = await sync_sheets(payload=payload, conn=mock_conn)
     
-    assert res.upserted == 1
-    assert res.skipped == 0
-    assert res.quality_inserted == 1
-    assert len(res.errors) == 0
+    assert res["upserted"] == 1
+    assert res["skipped"] == 0
+    assert res["quarantined"] == 1
+    assert len(res["errors"]) == 0
     
     # Check that transaction block was used
     assert mock_conn.transaction.called

@@ -46,6 +46,7 @@ export interface WorkRecord {
   scheduled_end_date: string | null;
   actual_completion_date: string | null;
   physical_progress_pct: number | null;
+  progress_inferred?: boolean | null;
   financial_progress_pct: number | null;
   fin_progress_anomaly: boolean | null;
   days_overdue: number | null;
@@ -86,6 +87,9 @@ export interface ContractorRecord {
   avg_financial_progress_pct: number;
   total_expenditure_lacs: number;
   risk_score_avg: number;
+  max_risk_score?: number;
+  avg_physical_progress_pct?: number;
+  health_rating?: string;
 }
 
 export interface QualityBacklogRow {
@@ -128,6 +132,19 @@ export interface ConstituencyRecord {
   completed_count?: number;
 }
 
+export interface WardRecord {
+  ward: string;
+  constituency: string;
+  total_works: number;
+  br_works: number;
+  om_works: number;
+  sanctioned_cost_lacs: number;
+  tender_value_lacs: number;
+  expenditure_lacs: number;
+  utilization_pct: number;
+  critical_works_count: number;
+}
+
 export interface ZoneRecord {
   zone: string;
   branch: string;
@@ -158,11 +175,11 @@ export interface FundDistributionRecord {
 
 // ─── Fetch helpers ───────────────────────────────────────────
 
-async function apiFetch<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+async function apiFetch<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
   const url = new URL(path, API_BASE_URL);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value !== undefined && value !== null && value !== '' && value !== 'all' && value !== 'All') {
         url.searchParams.set(key, String(value));
       }
     });
@@ -188,7 +205,10 @@ export interface WorksFilters {
   constituency?: string;
   delivery_status?: string;
   workflow_stage?: string;
+  risk_score_min?: number;
   search?: string;
+  sort_by?: string;
+  sort_order?: string;
   page?: number;
   page_size?: number;
 }
@@ -207,6 +227,10 @@ export function fetchQuality(page = 1, pageSize = 50): Promise<QualityData> {
 
 export function fetchConstituencies(branch?: string): Promise<ConstituencyRecord[]> {
   return apiFetch<ConstituencyRecord[]>('/kpis/constituencies', { branch });
+}
+
+export function fetchWards(constituency?: string, branch?: string): Promise<WardRecord[]> {
+  return apiFetch<WardRecord[]>('/kpis/wards', { constituency, branch });
 }
 
 export function fetchZoneProgress(branch?: string): Promise<ZoneProgressRecord[]> {
@@ -228,3 +252,54 @@ export function fetchSyncStatus(): Promise<SyncStatus> {
 export function fetchHealth(): Promise<{ status: string; database_connected: boolean }> {
   return apiFetch('/health');
 }
+
+export interface DashboardUser {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  created_at: string | null;
+}
+
+export function fetchUsers(): Promise<DashboardUser[]> {
+  return apiFetch<DashboardUser[]>('/admin/users');
+}
+
+export async function createUser(data: { name: string; email: string; role: string }): Promise<DashboardUser> {
+  const res = await fetch(`${API_BASE_URL}/admin/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to create user' }));
+    throw new Error(err.detail || 'Failed to create user');
+  }
+  return res.json();
+}
+
+export async function updateUser(id: number, data: { role?: string; is_active?: boolean }): Promise<DashboardUser> {
+  const res = await fetch(`${API_BASE_URL}/admin/users/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to update user' }));
+    throw new Error(err.detail || 'Failed to update user');
+  }
+  return res.json();
+}
+
+export async function deleteUser(id: number): Promise<{ status: string; id: number }> {
+  const res = await fetch(`${API_BASE_URL}/admin/users/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete user' }));
+    throw new Error(err.detail || 'Failed to delete user');
+  }
+  return res.json();
+}
+

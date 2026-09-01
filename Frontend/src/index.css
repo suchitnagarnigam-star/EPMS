@@ -19,6 +19,7 @@
   --text-2:          #94a3b8;
   --text-3:          #64748b;
   --text-4:          #334155;
+  --chart-text:      #94a3b8;
 
   --accent:          #4f6ef7;
   --accent-dim:      rgba(79, 110, 247, 0.18);
@@ -57,55 +58,56 @@
   --mesh-b: rgba(52, 211, 153, 0.08);
 }
 
-/* ── LIGHT THEME (SUBTLE & EASY ON EYES) ── */
+/* ── LIGHT THEME (SOLID SURFACES & CRISP CONTRAST) ── */
 [data-theme="light"] {
-  --bg:              #ebf0f7; /* Soft slate-tinted off-white, no eye glare */
-  --surface:         rgba(255, 255, 255, 0.75);
-  --card:            rgba(255, 255, 255, 0.65);
-  --card-alt:        rgba(238, 242, 248, 0.70);
-  --border:          rgba(15, 23, 42, 0.08);
-  --border-subtle:   rgba(15, 23, 42, 0.04);
-  --hover:           rgba(79, 110, 247, 0.06);
+  --bg:              #f8fafc; /* Slate 50 clean backdrop */
+  --surface:         #ffffff;
+  --card:            #ffffff;
+  --card-alt:        #f1f5f9;
+  --border:          #e2e8f0;
+  --border-subtle:   #f1f5f9;
+  --hover:           #f1f5f9;
 
   --text-1:          #0f172a; /* Slate 900 */
   --text-2:          #334155; /* Slate 700 */
   --text-3:          #64748b; /* Slate 500 */
   --text-4:          #94a3b8; /* Slate 400 */
+  --chart-text:      #374151; /* Gray 700 for Recharts ticks */
 
-  --accent:          #4f6ef7;
-  --accent-dim:      rgba(79, 110, 247, 0.12);
-  --accent-hover:    #3a57e0;
-  --accent-text:     #2563eb;
+  --accent:          #2563eb;
+  --accent-dim:      #eff6ff;
+  --accent-hover:    #1d4ed8;
+  --accent-text:     #1d4ed8;
 
   --success:         #059669;
-  --success-bg:      rgba(16, 185, 129, 0.12);
+  --success-bg:      #ecfdf5;
   --warn:            #d97706;
-  --warn-bg:         rgba(245, 158, 11, 0.12);
+  --warn-bg:         #fffbeb;
   --danger:          #dc2626;
-  --danger-bg:       rgba(239, 68, 68, 0.12);
+  --danger-bg:       #fef2f2;
   --info:            #0284c7;
-  --info-bg:         rgba(14, 165, 233, 0.12);
+  --info-bg:         #f0f9ff;
 
-  --input-bg:        rgba(255, 255, 255, 0.85);
-  --input-border:    rgba(15, 23, 42, 0.12);
-  --input-focus:     #4f6ef7;
+  --input-bg:        #ffffff;
+  --input-border:    #cbd5e1;
+  --input-focus:     #2563eb;
   --select-bg:       #ffffff;
 
-  --scrollbar:       rgba(15, 23, 42, 0.18);
-  --scrollbar-hover: rgba(15, 23, 42, 0.32);
+  --scrollbar:       #cbd5e1;
+  --scrollbar-hover: #94a3b8;
 
-  --sidebar-bg:      rgba(255, 255, 255, 0.70);
-  --topbar-bg:       rgba(255, 255, 255, 0.65);
-  --tbl-head-bg:     rgba(240, 244, 250, 0.85);
-  --tbl-row-border:  rgba(15, 23, 42, 0.05);
+  --sidebar-bg:      #ffffff;
+  --topbar-bg:       #ffffff;
+  --tbl-head-bg:     #f8fafc;
+  --tbl-row-border:  #e2e8f0;
 
-  --glass-bg:        rgba(255, 255, 255, 0.60);
-  --glass-border:    rgba(255, 255, 255, 0.85);
-  --glass-shadow:    0 10px 30px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  --glass-shadow-lg: 0 18px 45px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --glass-bg:        #ffffff;
+  --glass-border:    #e2e8f0;
+  --glass-shadow:    0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --glass-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
-  --mesh-a: rgba(79, 110, 247, 0.07);
-  --mesh-b: rgba(52, 211, 153, 0.05);
+  --mesh-a: rgba(37, 99, 235, 0.05);
+  --mesh-b: rgba(16, 185, 129, 0.04);
 }
 
 /* Fallback override for inline legacy hardcoded dark styles in Light Mode */

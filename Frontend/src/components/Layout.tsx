@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, MapPin,
-  Star, Bell, ChevronDown, Activity, LogOut,
+  Star, ChevronDown, Activity, LogOut,
   Sun, Moon, ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -230,27 +230,15 @@ export default function Layout() {
               }
             </button>
 
-            {/* Notifications */}
-            <button
-              className="relative w-8 h-8 flex items-center justify-center rounded-lg"
-              style={{ color: 'var(--text-3)' }}
-            >
-              <Bell size={15} strokeWidth={1.75} />
-              <span
-                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
-                style={{
-                  background: 'var(--danger)',
-                  animation: 'pulse-dot 2s ease-in-out infinite',
-                }}
-              />
-            </button>
-
             {/* User chip */}
-            <div
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+            <button
+              onClick={() => navigate('/profile')}
+              title="View Profile & Admin Access"
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-all hover:brightness-110"
               style={{
                 background: 'var(--glass-bg)',
                 border: '1px solid var(--glass-border)',
+                cursor: 'pointer',
               }}
             >
               <div
@@ -266,7 +254,7 @@ export default function Layout() {
                 <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>Commissioner</p>
               </div>
               <ChevronDown size={11} color="var(--text-3)" />
-            </div>
+            </button>
 
             {/* Sign out */}
             <button

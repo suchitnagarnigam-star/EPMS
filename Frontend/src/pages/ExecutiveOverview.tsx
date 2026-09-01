@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Filter, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Download, Filter, Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, PieChart, Pie, Legend, Sector, type PieSectorDataItem,
@@ -9,6 +9,7 @@ import StatCard from '../components/StatCard';
 import StageBadge from '../components/StageBadge';
 import RiskBadge from '../components/RiskBadge';
 import ProgressBar from '../components/ProgressBar';
+import MethodologyTooltip from '../components/MethodologyTooltip';
 import { useApi } from '../data/useApi';
 import { fetchKpis, fetchWorks, fetchZones, fetchFundDistribution } from '../data/api';
 import type { KpiData, WorkRecord, ZoneRecord, FundDistributionRecord } from '../data/api';
@@ -92,9 +93,15 @@ export default function ExecutiveOverview() {
   const [branch, setBranch] = useState('All');
   const [zone,   setZone]   = useState('All');
   const [search, setSearch] = useState('');
+  const [expandedChart, setExpandedChart] = useState<'delivery' | 'zone' | 'fund' | null>(null);
 
-  // API branch param: 'All' → undefined (no filter)
-  const apiBranch = branch === 'All' ? undefined : branch;
+  const cleanParam = (val: string | undefined) => {
+    if (!val || val === 'All' || val === 'all' || val.trim() === '') return undefined;
+    return val;
+  };
+
+  const apiBranch = cleanParam(branch);
+  const apiZone   = cleanParam(zone);
 
   // Fetch data from backend
   const { data: kpis, loading: kpisLoading, error: kpisError, refetch: refetchKpis } =
@@ -103,10 +110,11 @@ export default function ExecutiveOverview() {
   const { data: criticalWorks, loading: worksLoading, error: worksError, refetch: refetchWorks } =
     useApi(() => fetchWorks({
       branch: apiBranch,
-      zone: zone === 'All' ? undefined : zone,
+      zone: apiZone,
+      risk_score_min: 30,
       page: 1,
       page_size: 50,
-    }), [apiBranch, zone]);
+    }), [apiBranch, apiZone]);
 
   const { data: zoneProgress, loading: zonesLoading } =
     useApi<ZoneRecord[]>(() => fetchZones(apiBranch), [apiBranch]);
@@ -150,8 +158,8 @@ export default function ExecutiveOverview() {
 
   // Critical works (high risk) — filter from results
   const criticalList: WorkRecord[] = (criticalWorks?.results || [])
-    .filter(w => (w.risk_score ?? 0) >= 30)
-    .sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0));
+    .filter(w => Number(w.risk_score ?? 0) >= 30)
+    .sort((a, b) => Number(b.risk_score ?? 0) - Number(a.risk_score ?? 0));
 
   // Apply local search filter
   const filtered = criticalList.filter(w =>
@@ -172,6 +180,120 @@ export default function ExecutiveOverview() {
   const disbursedPct = kpis && kpis.total_tender_cost_lacs > 0
     ? ((kpis.total_expenditure_lacs / kpis.total_tender_cost_lacs) * 100).toFixed(1)
     : '0';
+
+  const toggleExpand = (chartId: 'delivery' | 'zone' | 'fund') => {
+    setExpandedChart(prev => prev === chartId ? null : chartId);
+  };
+
+  const renderDeliveryChart = (height = 200) => (
+    <div className="card p-5 flex flex-col gap-3 animate-slide-up relative transition-all duration-300">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Works by Delivery Status</h3>
+          <MethodologyTooltip metric="total_works" />
+        </div>
+        <button
+          onClick={() => toggleExpand('delivery')}
+          title={expandedChart === 'delivery' ? 'Collapse chart' : 'Expand chart'}
+          className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          {expandedChart === 'delivery' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+      </div>
+      <p className="text-[11px]" style={{ color: 'var(--text-3)' }}>
+        Current portfolio distribution — {totalWorks.toLocaleString()} works
+      </p>
+      {kpisLoading ? (
+        <LoadingSkeleton height={height} />
+      ) : (
+        <ResponsiveContainer width="100%" height={height}>
+          <PieChart>
+            <Pie
+              data={stageDistribution}
+              cx="50%" cy="50%"
+              innerRadius={expandedChart === 'delivery' ? 80 : 55}
+              outerRadius={expandedChart === 'delivery' ? 120 : 80}
+              dataKey="value"
+              strokeWidth={0}
+              stroke="none"
+              activeShape={ActivePieShape}
+            >
+              {stageDistribution.map((entry, i) => <Cell key={i} fill={entry.fill} stroke="none" />)}
+            </Pie>
+            <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: expandedChart === 'delivery' ? 12 : 11, color: '#606060' }} />
+          </PieChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+
+  const renderZoneChart = (height = 200) => (
+    <div className="card p-5 flex flex-col gap-3 animate-slide-up relative transition-all duration-300">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Progress by Zone</h3>
+          <MethodologyTooltip metric="physical_progress" />
+        </div>
+        <button
+          onClick={() => toggleExpand('zone')}
+          title={expandedChart === 'zone' ? 'Collapse chart' : 'Expand chart'}
+          className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          {expandedChart === 'zone' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+      </div>
+      <p className="text-[11px]" style={{ color: 'var(--text-3)' }}>Avg physical progress — B&amp;R vs O&amp;M</p>
+      {zonesLoading ? (
+        <LoadingSkeleton height={height} />
+      ) : (
+        <ResponsiveContainer width="100%" height={height}>
+          <BarChart data={zoneChartData} barGap={2} barSize={expandedChart === 'zone' ? 18 : 10}>
+            <XAxis dataKey="zone" tick={{ fill: 'var(--chart-text, #505050)', fontSize: expandedChart === 'zone' ? 12 : 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: 'var(--chart-text, #505050)', fontSize: expandedChart === 'zone' ? 12 : 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
+            <Bar dataKey="BR" fill="#4f6ef7" radius={[3,3,0,0]} name="B&R" activeBar={makeBrightBar('#7b93ff')} />
+            <Bar dataKey="OM" fill="#3d9bd4" radius={[3,3,0,0]} name="O&M" activeBar={makeBrightBar('#60b8e8')} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+
+  const renderFundChart = (height = 200) => (
+    <div className="card p-5 flex flex-col gap-3 animate-slide-up relative transition-all duration-300">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Expenditure by Fund Type (₹ Lacs)</h3>
+          <MethodologyTooltip metric="verified_disbursed" />
+        </div>
+        <button
+          onClick={() => toggleExpand('fund')}
+          title={expandedChart === 'fund' ? 'Collapse chart' : 'Expand chart'}
+          className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          {expandedChart === 'fund' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+      </div>
+      <p className="text-[11px]" style={{ color: 'var(--text-3)' }}>Disbursement distribution across funding sources</p>
+      {fundLoading ? (
+        <LoadingSkeleton height={height} />
+      ) : (
+        <ResponsiveContainer width="100%" height={height}>
+          <BarChart data={fundChartData} barSize={expandedChart === 'fund' ? 22 : 14}>
+            <XAxis dataKey="name" tick={{ fill: 'var(--chart-text, #505050)', fontSize: expandedChart === 'fund' ? 12 : 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: 'var(--chart-text, #505050)', fontSize: expandedChart === 'fund' ? 12 : 10 }} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }} formatter={(v) => [`₹${Number(v).toLocaleString()} L`, '']} />
+            <Bar dataKey="expenditure" name="₹ Lacs" radius={[3,3,0,0]} activeBar={makeBrightBar()}>
+              {fundChartData.map((d, i) => (
+                <Cell key={i} fill={d.color} stroke="none" />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
 
   return (
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
@@ -213,82 +335,30 @@ export default function ExecutiveOverview() {
         )}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        {/* Stage Distribution Donut */}
-        <div className="card p-5 flex flex-col gap-3 animate-slide-up" style={{ animationDelay: '100ms' }}>
-          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Works by Delivery Status</h3>
-          <p className="text-[11px]" style={{ color: 'var(--text-3)' }}>
-            Current portfolio distribution — {totalWorks.toLocaleString()} works
-          </p>
-          {kpisLoading ? (
-            <LoadingSkeleton />
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={stageDistribution}
-                  cx="50%" cy="50%"
-                  innerRadius={55} outerRadius={80}
-                  dataKey="value"
-                  strokeWidth={0}
-                  stroke="none"
-                  activeShape={ActivePieShape}
-                >
-                  {stageDistribution.map((entry, i) => <Cell key={i} fill={entry.fill} stroke="none" />)}
-                </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#606060' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
+      {/* Charts Row with Expandable Interaction */}
+      {!expandedChart ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 transition-all duration-500">
+          {renderDeliveryChart(200)}
+          {renderZoneChart(200)}
+          {renderFundChart(200)}
         </div>
-
-        {/* Zone Progress Grouped Bar */}
-        <div className="card p-5 flex flex-col gap-3 animate-slide-up" style={{ animationDelay: '180ms' }}>
-          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Progress by Zone</h3>
-          <p className="text-[11px]" style={{ color: 'var(--text-3)' }}>Avg physical progress — B&amp;R vs O&amp;M</p>
-          {zonesLoading ? (
-            <LoadingSkeleton />
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={zoneChartData} barGap={2} barSize={10}>
-                <XAxis dataKey="zone" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
-                <Bar dataKey="BR" fill="#4f6ef7" radius={[3,3,0,0]} name="B&R"
-                     activeBar={makeBrightBar('#7b93ff')} />
-                <Bar dataKey="OM" fill="#3d9bd4" radius={[3,3,0,0]} name="O&M"
-                     activeBar={makeBrightBar('#60b8e8')} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 transition-all duration-500">
+          {/* Left Column: Expanded Chart */}
+          <div className="min-w-0">
+            {expandedChart === 'delivery' && renderDeliveryChart(360)}
+            {expandedChart === 'zone' && renderZoneChart(360)}
+            {expandedChart === 'fund' && renderFundChart(360)}
+          </div>
+          {/* Right Column: Stacked Non-Expanded Charts */}
+          <div className="flex flex-col gap-4 min-w-0">
+            {expandedChart !== 'delivery' && renderDeliveryChart(150)}
+            {expandedChart !== 'zone' && renderZoneChart(150)}
+            {expandedChart !== 'fund' && renderFundChart(150)}
+          </div>
         </div>
+      )}
 
-        {/* Expenditure by Fund Type */}
-        <div className="card p-5 flex flex-col gap-3 animate-slide-up" style={{ animationDelay: '260ms' }}>
-          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>Expenditure by Fund Type (₹ Lacs)</h3>
-          <p className="text-[11px]" style={{ color: 'var(--text-3)' }}>Disbursement distribution across funding sources</p>
-          {fundLoading ? (
-            <LoadingSkeleton />
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={fundChartData} barSize={14}>
-                <XAxis dataKey="name" tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#ffffff08' }}
-                         formatter={(v) => [`₹${Number(v).toLocaleString()} L`, '']} />
-                <Bar dataKey="expenditure" name="₹ Lacs" radius={[3,3,0,0]} activeBar={makeBrightBar()}>
-                  {fundChartData.map((d, i) => (
-                    <Cell key={i} fill={d.color} stroke="none" />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
 
       {/* High Risk Works Table */}
       <div className="card overflow-hidden animate-slide-up" style={{ animationDelay: '320ms' }}>

@@ -12,9 +12,16 @@ router = APIRouter(
 
 @router.get("")
 async def get_kpis(branch: Optional[str] = None, conn: Connection = Depends(get_db)):
+    branch_val = branch.strip() if branch and branch.strip() and branch.lower() != 'all' else None
+    
+    where_branch_fact = "WHERE branch = $1" if branch_val else ""
+    where_branch_f = "WHERE F.branch = $1" if branch_val else ""
+    where_branch_fact_and = "WHERE branch = $1 AND" if branch_val else "WHERE"
+    params = [branch_val] if branch_val else []
+
     # 1. Fetch general aggregates and by_fund_type breakdown
     agg_row = await conn.fetchrow(
-        """
+        f"""
         SELECT
             COUNT(*)::integer AS total_works,
             COALESCE(SUM(est_cost_lacs), 0)::float AS total_est_cost_lacs,
@@ -28,38 +35,37 @@ async def get_kpis(branch: Optional[str] = None, conn: Connection = Depends(get_
                     SELECT COALESCE(DF.fund_type, 'Unspecified') as fund_type, COUNT(*) as total
                     FROM fact_works F
                     LEFT JOIN dim_fund DF ON F.fund_id = DF.fund_id
-                    WHERE ($1::varchar IS NULL OR F.branch = $1)
+                    {where_branch_f}
                     GROUP BY DF.fund_type
                 ) t
             ) AS by_fund_type
         FROM fact_works
-        WHERE ($1::varchar IS NULL OR branch = $1)
+        {where_branch_fact}
         """,
-        branch
+        *params
     )
 
     # 2. Fetch by_branch distribution
     branch_rows = await conn.fetch(
-        """
+        f"""
         SELECT branch, COUNT(*)::integer AS count
         FROM fact_works
-        WHERE ($1::varchar IS NULL OR branch = $1)
+        {where_branch_fact}
         GROUP BY branch
         """,
-        branch
+        *params
     )
     by_branch = {row['branch']: row['count'] for row in branch_rows}
 
     # 3. Fetch by_delivery_status — canonical values only
     status_rows = await conn.fetch(
-        """
+        f"""
         SELECT delivery_status as status, COUNT(*)::integer AS count
         FROM fact_works
-        WHERE ($1::varchar IS NULL OR branch = $1)
-          AND delivery_status IN ('In Progress','Delayed/Held Up','Completed','Not Started','Procurement')
+        {where_branch_fact_and} delivery_status IN ('In Progress','Delayed/Held Up','Completed','Not Started','Procurement')
         GROUP BY delivery_status
         """,
-        branch
+        *params
     )
     by_delivery_status = {row['status']: row['count'] for row in status_rows}
 
@@ -71,14 +77,13 @@ async def get_kpis(branch: Optional[str] = None, conn: Connection = Depends(get_
 
     # 4. Fetch by_workflow_stage — canonical values only
     stage_rows = await conn.fetch(
-        """
+        f"""
         SELECT workflow_stage as stage, COUNT(*)::integer AS count
         FROM fact_works
-        WHERE ($1::varchar IS NULL OR branch = $1)
-          AND workflow_stage IN ('Awarded','Work Order Issued','Procurement','Approval Pending','In Progress','Completed','Not Started','Delayed/Held Up')
+        {where_branch_fact_and} workflow_stage IN ('Awarded','Work Order Issued','Procurement','Approval Pending','In Progress','Completed','Not Started','Delayed/Held Up')
         GROUP BY workflow_stage
         """,
-        branch
+        *params
     )
     by_workflow_stage = {row['stage']: row['count'] for row in stage_rows}
 
@@ -111,14 +116,14 @@ async def get_constituency_kpis(
 ):
     conditions = []
     args = []
-    if branch:
-        args.append(branch)
+    if branch and branch.strip() and branch.lower() != 'all':
+        args.append(branch.strip())
         conditions.append(f"F.branch = ${len(args)}")
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
     rows = await conn.fetch(f"""
         SELECT
-            COALESCE(L.constituency, 'Unassigned') AS constituency,
+            COALESCE(INITCAP(TRIM(L.constituency)), 'Unassigned') AS constituency,
             COUNT(F.work_id)::integer                               AS total_works,
             COUNT(CASE WHEN F.branch = 'B&R' THEN 1 END)::integer   AS br_works,
             COUNT(CASE WHEN F.branch = 'O&M' THEN 1 END)::integer   AS om_works,
@@ -130,7 +135,7 @@ async def get_constituency_kpis(
         FROM fact_works F
         LEFT JOIN dim_location L ON F.location_id = L.location_id
         {where}
-        GROUP BY L.constituency
+        GROUP BY INITCAP(TRIM(L.constituency))
         ORDER BY total_works DESC
     """, *args)
 
@@ -144,8 +149,8 @@ async def get_zone_kpis(
 ):
     conditions = ["L.zone IS NOT NULL"]
     args = []
-    if branch:
-        args.append(branch)
+    if branch and branch.strip() and branch.lower() != 'all':
+        args.append(branch.strip())
         conditions.append(f"F.branch = ${len(args)}")
     where = f"WHERE {' AND '.join(conditions)}"
 
@@ -194,3 +199,50 @@ async def get_fund_distribution(conn: Connection = Depends(get_db)):
         }
         for row in rows
     ]
+
+
+@router.get("/wards")
+async def get_ward_kpis(
+    constituency: Optional[str] = None,
+    branch: Optional[str] = None,
+    conn: Connection = Depends(get_db)
+):
+    conditions = ["dl.ward IS NOT NULL", "dl.ward != ''"]
+    params = []
+
+    if constituency and constituency.strip() and constituency.lower() != 'all':
+        params.append(constituency.strip())
+        conditions.append(f"INITCAP(TRIM(dl.constituency)) = INITCAP(TRIM(${len(params)}))")
+
+    if branch and branch.strip() and branch.lower() != 'all':
+        params.append(branch.strip())
+        conditions.append(f"fw.branch = ${len(params)}")
+
+    where_clause = " AND ".join(conditions)
+
+    query = f"""
+        SELECT 
+            dl.ward,
+            INITCAP(TRIM(dl.constituency)) as constituency,
+            COUNT(fw.work_id)::integer as total_works,
+            COUNT(*) FILTER (WHERE fw.branch = 'B&R')::integer as br_works,
+            COUNT(*) FILTER (WHERE fw.branch = 'O&M')::integer as om_works,
+            ROUND(SUM(COALESCE(fw.est_cost_lacs, 0))::numeric, 2)::float as sanctioned_cost_lacs,
+            ROUND(SUM(COALESCE(fw.tender_cost_lacs, 0))::numeric, 2)::float as tender_value_lacs,
+            ROUND(SUM(COALESCE(fw.expenditure_lacs, 0))::numeric, 2)::float as expenditure_lacs,
+            ROUND(
+                CASE WHEN SUM(COALESCE(fw.tender_cost_lacs, 0)) > 0 
+                THEN (SUM(COALESCE(fw.expenditure_lacs, 0)) / SUM(fw.tender_cost_lacs)) * 100 
+                ELSE 0 END::numeric, 1
+            )::float as utilization_pct,
+            COUNT(*) FILTER (WHERE fw.risk_score >= 30)::integer as critical_works_count
+        FROM fact_works fw
+        JOIN dim_location dl ON fw.location_id = dl.location_id
+        WHERE {where_clause}
+        GROUP BY dl.ward, INITCAP(TRIM(dl.constituency))
+        ORDER BY sanctioned_cost_lacs DESC NULLS LAST
+    """
+    rows = await conn.fetch(query, *params)
+    return [dict(r) for r in rows]
+
+

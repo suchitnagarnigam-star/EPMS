@@ -71,6 +71,9 @@ export default function DataQuality() {
             <p className="text-[11px] mt-1.5" style={{ color: '#505050' }}>
               Rows failing project identification or schema validation
             </p>
+            <p className="text-[10px] mt-1 italic" style={{ color: 'var(--text-3)' }}>
+              Unique source rows with data issues — rows reappear each sync until fixed in the master tracker.
+            </p>
           </div>
         </div>
 

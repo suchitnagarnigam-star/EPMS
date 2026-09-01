@@ -14,20 +14,23 @@ def parse_date_safe(v: Any) -> Optional[date]:
         v = v.strip()
         if not v or v.lower() in ('na', 'n/a', '-', '_', 'nil', 'null', 'none'):
             return None
-        # Match YYYY-MM-DD
-        m1 = re.match(r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})', v)
-        if m1:
-            try:
-                return date(int(m1.group(1)), int(m1.group(2)), int(m1.group(3)))
-            except ValueError:
-                pass
-        # Match DD/MM/YYYY or DD-MM-YYYY
-        m2 = re.match(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})', v)
+        
+        # Pre-clean regex search: extract DD/MM/YYYY or DD-MM-YYYY anywhere in string (e.g. '2655 11/02/2026')
+        m2 = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', v)
         if m2:
             try:
                 return date(int(m2.group(3)), int(m2.group(2)), int(m2.group(1)))
             except ValueError:
                 pass
+
+        # Pre-clean regex search: extract YYYY-MM-DD anywhere in string
+        m1 = re.search(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})', v)
+        if m1:
+            try:
+                return date(int(m1.group(1)), int(m1.group(2)), int(m1.group(3)))
+            except ValueError:
+                pass
+
         # Fallback to standard ISO parser
         try:
             return date.fromisoformat(v[:10])
@@ -46,20 +49,26 @@ def parse_datetime_safe(v: Any) -> Optional[datetime]:
         v = v.strip()
         if not v or v.lower() in ('na', 'n/a', '-', '_', 'nil', 'null', 'none'):
             return None
+
+        # Search YYYY-MM-DD HH:MM:SS
+        m_dt = re.search(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})', v)
+        if m_dt:
+            try:
+                return datetime(
+                    int(m_dt.group(1)), int(m_dt.group(2)), int(m_dt.group(3)),
+                    int(m_dt.group(4)), int(m_dt.group(5)), int(m_dt.group(6))
+                )
+            except ValueError:
+                pass
+
+        d = parse_date_safe(v)
+        if d:
+            return datetime(d.year, d.month, d.day)
+
         try:
             return datetime.fromisoformat(v.replace("Z", "+00:00"))
         except ValueError:
             pass
-        # Match YYYY-MM-DD HH:MM:SS
-        m = re.match(r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})', v)
-        if m:
-            try:
-                return datetime(
-                    int(m.group(1)), int(m.group(2)), int(m.group(3)),
-                    int(m.group(4)), int(m.group(5)), int(m.group(6))
-                )
-            except ValueError:
-                pass
     return None
 
 class WorkSyncItem(BaseModel):

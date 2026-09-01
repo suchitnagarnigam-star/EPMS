@@ -174,6 +174,7 @@ async def insert_quality_row(conn, row: QualitySyncItem):
         """
         INSERT INTO data_quality (source_sheet, source_row, work_description, raw_zone, raw_ward, raw_status, flags, raw_json, staged_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+        ON CONFLICT (source_sheet, source_row, flags) DO NOTHING
         """,
         row.source_sheet,
         row.source_row,
@@ -190,16 +191,21 @@ async def insert_quality_row(conn, row: QualitySyncItem):
 # ── DIMENSIONS ──
 
 async def resolve_location(conn, row: WorkSyncItem) -> int | None:
-    if not row.zone and not row.constituency:
+    zone = row.zone.strip() if row.zone else None
+    sub_zone = row.sub_zone.strip() if row.sub_zone else None
+    constituency = row.constituency.strip().title() if row.constituency else None
+    ward = str(row.ward).strip() if row.ward is not None else None
+
+    if not zone and not constituency:
         return None
     res = await conn.fetchrow(
         "INSERT INTO dim_location (zone, sub_zone, constituency, ward) VALUES ($1, $2, $3, $4) ON CONFLICT (zone, sub_zone, constituency, ward) DO NOTHING RETURNING location_id",
-        row.zone, row.sub_zone, row.constituency, row.ward
+        zone, sub_zone, constituency, ward
     )
     if not res:
         res = await conn.fetchrow(
             "SELECT location_id FROM dim_location WHERE zone IS NOT DISTINCT FROM $1 AND sub_zone IS NOT DISTINCT FROM $2 AND constituency IS NOT DISTINCT FROM $3 AND ward IS NOT DISTINCT FROM $4",
-            row.zone, row.sub_zone, row.constituency, row.ward
+            zone, sub_zone, constituency, ward
         )
     return res["location_id"] if res else None
 
@@ -254,7 +260,9 @@ def compute_days_overdue(row: WorkSyncItem) -> int | None:
     if row.delivery_status == "Completed" or not row.scheduled_end_date:
         return None
     delta = (date.today() - row.scheduled_end_date).days
-    return delta if delta > 0 else 0
+    if delta <= 0:
+        return 0
+    return min(delta, 3650)  # 10-year cap on overdue
 
 def compute_risk_score(row: WorkSyncItem, days_overdue: int | None) -> float:
     score = 0.0
@@ -265,7 +273,8 @@ def compute_risk_score(row: WorkSyncItem, days_overdue: int | None) -> float:
     prog = (exp / est) * 100
     if prog < 10 and row.delivery_status not in ("Not Started", "Tendered", "Procurement"):
         score += 20
-    return round(score, 2)
+    return round(min(score, 999.0), 2)  # Hard cap at 999
+
 
 @router.get("/status")
 async def get_sync_status(conn=Depends(get_db)):
