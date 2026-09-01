@@ -48,7 +48,7 @@ Main Tracker (B&R / O&M tabs)
 | `/kpis/constituencies` | GET | Constituency-level aggregates (cost, expenditure, counts) | Optional: `branch` |
 | `/kpis/zones` | GET | Zone-level avg physical/financial progress by branch | Optional: `branch` |
 | `/kpis/fund-distribution` | GET | Expenditure breakdown by fund type | None |
-| `/works` | GET | Paginated works list with dimension joins | `page`, `page_size`, `branch`, `zone`, `constituency`, `delivery_status`, `workflow_stage`, `search` |
+| `/works` | GET | Paginated works list with dimension joins | `page`, `page_size`, `branch`, `zone`, `constituency`, `delivery_status`, `workflow_stage`, `search`, `sort_by`, `sort_order` |
 | `/contractors` | GET | Agency performance ranked by risk | None |
 | `/quality` | GET | Analytics readiness stats + paginated backlog rows | `page`, `page_size` |
 | `/health` | GET | DB connection health check | None |
@@ -98,7 +98,6 @@ Main Tracker (B&R / O&M tabs)
 - Resilient API structure with loading/error states (`useApi.ts`, `api.ts`, `apiConfig.ts`).
 - **Methodology Registry & React Portal Tooltips**: Built centralized metric definitions registry (`methodology.ts`) and refactored `MethodologyTooltip.tsx` to render popovers via `createPortal` directly to `document.body` with viewport position calculation (`getBoundingClientRect()`) and scroll/resize repositioning. Completely immune to parent card `overflow: hidden` boundaries.
 - **Master Works Directory Sorting**: Added dynamic sorting controls (Risk Score, Cost, Days Overdue, Physical Progress) and header tooltip integrations.
-- **Executive Overview Filter Guards**: Wrapped all overview API hooks with `buildParams()` to ensure constituency, branch, zone, and status filters apply uniformly across all chart endpoints.
 - **Admin Email Management UI**: Built `dashboard_users` Neon DB table, `/admin/users` CRUD REST endpoints in FastAPI, and `ProfilePage.tsx` interface for admin email access management.
 - **Date Ingestion Sanitization**: Patched `parse_date_safe` in `models.py` with string regex extraction and a **Year ≥ 2000 guard** to reject Excel serial number errors (e.g. `10/01/1900`), fixing artificial risk score spikes (MCL-0357).
 - **Warm Beige Theme Engine**: Redesigned Light Theme (`[data-theme="light"]`) with a warm beige stone color palette (`#f5f2eb`), rich stone typography (`#1c1917`), warm indigo accents (`#3551e0`), and warm amber/emerald/crimson status badges.
@@ -109,7 +108,7 @@ Main Tracker (B&R / O&M tabs)
 
 | Table | Row Count | Notes |
 |---|---|---|
-| `fact_works` | 637 | Live production data |
+| `fact_works` | 1,120 | Live production data |
 | `dim_location` | 208 | Normalized constituency names (`INITCAP(TRIM())`) |
 | `dim_agency` | 264 | |
 | `dim_fund` | 51 | |
@@ -125,14 +124,14 @@ Main Tracker (B&R / O&M tabs)
 
 ### Resolved Issues ✅
 1. **MCL-0357 Bad Date / Risk Score Spike**: Fixed via regex string cleaning and Year ≥ 2000 date guard in `parse_date_safe`.
-2. **Executive Overview Filter Sync**: Wrapped all KPI and breakdown API calls with `buildParams()` guard.
-3. **Tooltip Popover Clipping**: Solved by portaling tooltips to `document.body` via `createPortal`.
-4. **Data Quality Duplicate Accumulation**: Unique constraint applied to `data_quality` and table truncated in Neon.
-5. **Constituency Name Inconsistency**: Cleaned in Neon DB via `INITCAP(TRIM())`.
+2. **Tooltip Popover Clipping**: Solved by portaling tooltips to `document.body` via `createPortal`.
+3. **Data Quality Duplicate Accumulation**: Unique constraint applied to `data_quality` and table truncated in Neon.
+4. **Constituency Name Inconsistency**: Cleaned in Neon DB via `INITCAP(TRIM())`.
 
 ### Pending Items 🔄
-1. **Phase 5 — SASCI-MDF Road Pipeline**: Road ingestion pipeline and `FlagshipAgenda.tsx` integration.
-2. **`dim_officer` population**: Refine `sync.py` officer resolution to match dim table pattern.
+1. **Executive Overview Filter Audit**: Audit and wrap all `useApi` / `apiFetch` hooks in `ExecutiveOverview.tsx` to ensure `buildParams()` wraps all calls (KPI summary, works list, chart data) consistently.
+2. **Phase 5 — SASCI-MDF Road Pipeline**: Road ingestion pipeline and `FlagshipAgenda.tsx` integration.
+3. **`dim_officer` population**: Refine `sync.py` officer resolution to match dim table pattern.
 
 ---
 
