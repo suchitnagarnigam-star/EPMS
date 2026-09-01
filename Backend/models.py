@@ -7,9 +7,9 @@ def parse_date_safe(v: Any) -> Optional[date]:
     if not v:
         return None
     if isinstance(v, datetime):
-        return v.date()
+        return v.date() if v.year >= 2000 else None
     if isinstance(v, date):
-        return v
+        return v if v.year >= 2000 else None
     if isinstance(v, str):
         v = v.strip()
         if not v or v.lower() in ('na', 'n/a', '-', '_', 'nil', 'null', 'none'):
@@ -19,7 +19,9 @@ def parse_date_safe(v: Any) -> Optional[date]:
         m2 = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', v)
         if m2:
             try:
-                return date(int(m2.group(3)), int(m2.group(2)), int(m2.group(1)))
+                d = date(int(m2.group(3)), int(m2.group(2)), int(m2.group(1)))
+                if d.year >= 2000:
+                    return d
             except ValueError:
                 pass
 
@@ -27,13 +29,17 @@ def parse_date_safe(v: Any) -> Optional[date]:
         m1 = re.search(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})', v)
         if m1:
             try:
-                return date(int(m1.group(1)), int(m1.group(2)), int(m1.group(3)))
+                d = date(int(m1.group(1)), int(m1.group(2)), int(m1.group(3)))
+                if d.year >= 2000:
+                    return d
             except ValueError:
                 pass
 
         # Fallback to standard ISO parser
         try:
-            return date.fromisoformat(v[:10])
+            d = date.fromisoformat(v[:10])
+            if d.year >= 2000:
+                return d
         except ValueError:
             pass
     return None
