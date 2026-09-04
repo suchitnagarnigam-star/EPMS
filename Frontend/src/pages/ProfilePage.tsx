@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Shield, UserPlus, Trash2, CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useApi } from '../data/useApi';
 import { fetchUsers, createUser, updateUser, deleteUser } from '../data/api';
 import type { DashboardUser } from '../data/api';
 
 export default function ProfilePage() {
+  const { user: currentUser } = useAuth();
   const { data: users, loading, error, refetch } = useApi<DashboardUser[]>(() => fetchUsers(), []);
 
   // Add User Form State
@@ -71,20 +73,24 @@ export default function ProfilePage() {
       <div className="card p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-xl shrink-0">
-            AD
+            {currentUser?.email ? currentUser.email.slice(0, 2).toUpperCase() : 'AD'}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-[16px] font-bold" style={{ color: 'var(--text-1)' }}>Admin</h3>
+              <h3 className="text-[16px] font-bold" style={{ color: 'var(--text-1)' }}>
+                {currentUser?.email ? currentUser.email.split('@')[0] : 'Admin'}
+              </h3>
               <span className="badge badge-success text-[10px]">Active Session</span>
             </div>
-            <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-2)' }}>suchitnagarnigam@gmail.com</p>
+            <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-2)' }}>
+              {currentUser?.email || 'admin@mcl.gov.in'}
+            </p>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[11px] px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-medium">
-                Role: Commissioner (Admin)
+                Role: {currentUser?.role ? currentUser.role.toUpperCase() : 'ADMIN'}
               </span>
               <span className="text-[11px] px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 font-medium">
-                Access Level: Full Read/Write
+                Access Level: Full Access
               </span>
             </div>
           </div>

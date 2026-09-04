@@ -1,35 +1,42 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Eye, EyeOff, ArrowRight, Lock, User } from 'lucide-react';
+import { Activity, Eye, EyeOff, ArrowRight, Lock, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 export default function Login() {
   const { login } = useAuth();
   const { theme, toggle } = useTheme();
-  const navigate   = useNavigate();
+  const navigate = useNavigate();
 
-  const [identifier, setIdentifier] = useState('');
-  const [password,   setPassword]   = useState('');
-  const [showPass,   setShowPass]   = useState(false);
-  const [error,      setError]      = useState('');
-  const [loading,    setLoading]    = useState(false);
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
 
-    if (!identifier.trim() || !password.trim()) {
-      setError('Please fill in both fields.');
+    if (!email.trim() || !password.trim()) {
+      setError('Please fill in both email and password.');
       return;
     }
 
     setLoading(true);
-
-    setTimeout(() => {
-      login(identifier.trim(), password);
+    try {
+      await login(email.trim(), password);
       navigate('/', { replace: true });
-    }, 700);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Login failed. Please check your credentials.');
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -107,37 +114,37 @@ export default function Login() {
             Sign in to your account
           </h2>
           <p className="text-[12px] mb-6" style={{ color: 'var(--text-3)' }}>
-            Enter your credentials to access the portal
+            Enter your email and password to access the portal
           </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
 
-            {/* Username */}
+            {/* Email */}
             <div className="flex flex-col gap-1.5">
               <label
-                htmlFor="identifier"
+                htmlFor="email"
                 className="text-[11px] font-semibold uppercase tracking-widest"
                 style={{ color: 'var(--text-3)' }}
               >
-                Username or Email
+                Email Address
               </label>
               <div
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all"
                 style={{
                   background: 'var(--input-bg)',
-                  border: `1px solid ${identifier ? 'var(--input-focus)' : 'var(--input-border)'}`,
-                  boxShadow: identifier ? '0 0 0 3px rgba(79,110,247,0.12)' : 'none',
+                  border: `1px solid ${email ? 'var(--input-focus)' : 'var(--input-border)'}`,
+                  boxShadow: email ? '0 0 0 3px rgba(79,110,247,0.12)' : 'none',
                 }}
               >
-                <User size={14} color="var(--text-3)" strokeWidth={1.5} />
+                <Mail size={14} color="var(--text-3)" strokeWidth={1.5} />
                 <input
-                  id="identifier"
-                  type="text"
-                  autoComplete="username"
+                  id="email"
+                  type="email"
+                  autoComplete="email"
                   autoFocus
-                  placeholder="e.g. admin or user@mcl.gov.in"
-                  value={identifier}
-                  onChange={e => { setIdentifier(e.target.value); setError(''); }}
+                  placeholder="admin@mcl.gov.in"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setError(''); }}
                   className="flex-1 bg-transparent outline-none text-[13px]"
                   style={{ color: 'var(--text-1)' }}
                 />

@@ -247,13 +247,13 @@ export default function Layout() {
                 className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
                 style={{ background: 'var(--accent-dim)', color: 'var(--accent-text)' }}
               >
-                {user ? user.slice(0, 2).toUpperCase() : 'AS'}
+                {user?.email ? user.email.slice(0, 2).toUpperCase() : 'AD'}
               </div>
               <div className="hidden sm:block">
                 <p className="text-[11px] font-semibold leading-none" style={{ color: 'var(--text-1)' }}>
-                  {user ?? 'Admin'}
+                  {user?.email ?? 'Admin'}
                 </p>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>Commissioner</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>{user?.role ? user.role.toUpperCase() : 'Commissioner'}</p>
               </div>
               <ChevronDown size={11} color="var(--text-3)" />
             </button>

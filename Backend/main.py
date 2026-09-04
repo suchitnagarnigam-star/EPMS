@@ -1,11 +1,14 @@
+import os
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import asyncpg
 
 from database import DATABASE_URL, get_pool_params
-from routers import sync, kpis, works, contractor, data_quality, admin
+from routers import auth, sync, kpis, works, contractor, data_quality, admin
+from routers.auth import get_current_user
 
 # Configure logging
 logging.basicConfig(
@@ -55,13 +58,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register routers
+# Middleware: Part A — GAS Sync API Key Protection for /sync/* routes
+@app.middleware("http")
+async def verify_sync_api_key(request: Request, call_next):
+    if request.url.path.startswith("/sync"):
+        sync_api_key = os.getenv("SYNC_API_KEY")
+        if sync_api_key:
+            client_key = request.headers.get("X-API-Key")
+            if not client_key or client_key != sync_api_key:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Forbidden: Invalid or missing X-API-Key header"}
+                )
+    return await call_next(request)
+
+# Register public & machine-to-machine routers
+app.include_router(auth.router)
 app.include_router(sync.router)
-app.include_router(kpis.router)
-app.include_router(works.router)
-app.include_router(contractor.router)
-app.include_router(data_quality.router)
-app.include_router(admin.router)
+
+# Register protected dashboard routers (Part B — Dashboard JWT Authentication)
+app.include_router(kpis.router, dependencies=[Depends(get_current_user)])
+app.include_router(works.router, dependencies=[Depends(get_current_user)])
+app.include_router(contractor.router, dependencies=[Depends(get_current_user)])
+app.include_router(data_quality.router, dependencies=[Depends(get_current_user)])
+app.include_router(admin.router, dependencies=[Depends(get_current_user)])
 
 @app.get("/health")
 async def health_check():

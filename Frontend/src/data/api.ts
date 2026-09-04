@@ -185,7 +185,13 @@ async function apiFetch<T>(path: string, params?: Record<string, string | number
     });
   }
 
-  const res = await fetch(url.toString());
+  const token = localStorage.getItem('mcl_auth_token');
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url.toString(), { headers });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`API ${res.status}: ${text || res.statusText}`);
@@ -293,9 +299,13 @@ export function fetchUsers(): Promise<DashboardUser[]> {
 }
 
 export async function createUser(data: { name: string; email: string; role: string }): Promise<DashboardUser> {
+  const token = localStorage.getItem('mcl_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch(`${API_BASE_URL}/admin/users`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -306,9 +316,13 @@ export async function createUser(data: { name: string; email: string; role: stri
 }
 
 export async function updateUser(id: number, data: { role?: string; is_active?: boolean }): Promise<DashboardUser> {
+  const token = localStorage.getItem('mcl_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch(`${API_BASE_URL}/admin/users/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -319,8 +333,13 @@ export async function updateUser(id: number, data: { role?: string; is_active?: 
 }
 
 export async function deleteUser(id: number): Promise<{ status: string; id: number }> {
+  const token = localStorage.getItem('mcl_auth_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch(`${API_BASE_URL}/admin/users/${id}`, {
     method: 'DELETE',
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Failed to delete user' }));

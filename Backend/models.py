@@ -210,3 +210,13 @@ class SyncResponse(BaseModel):
     skipped: int
     quality_inserted: int
     errors: List[str]
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+
