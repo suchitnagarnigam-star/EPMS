@@ -103,7 +103,7 @@ class WorkSyncItem(BaseModel):
 
     # Officer
     officer_id: Optional[int] = Field(None, validation_alias=AliasChoices('officer_id', 'officer_fk', 'OfficerId'))
-    officer_name: Optional[str] = Field(None, validation_alias=AliasChoices('officer_name', 'officer', 'Officer Name', 'Name of Officer'))
+    officer_name: Optional[str] = Field(None, validation_alias=AliasChoices('officer_name', 'officer', 'Officer Name', 'Name of Officer', 'supervising_officer'))
 
     # Work Details
     work_description: Optional[str] = Field(None, validation_alias=AliasChoices('work_description', 'description', 'Work Description'))
