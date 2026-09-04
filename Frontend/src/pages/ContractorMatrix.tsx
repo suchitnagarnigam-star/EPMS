@@ -1,14 +1,14 @@
-import { useState, useMemo } from 'react';
-import { Download, TrendingUp, TrendingDown, AlertTriangle, Clock, Loader2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Download, TrendingUp, TrendingDown, AlertTriangle, Clock, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   type BarShapeProps,
 } from 'recharts';
 import ProgressBar from '../components/ProgressBar';
 import MethodologyTooltip from '../components/MethodologyTooltip';
+import { useWorkModal } from '../context/WorkModalContext';
 import { useApi } from '../data/useApi';
-import { fetchContractors } from '../data/api';
-import type { ContractorRecord } from '../data/api';
+import { fetchContractors, fetchWorks, type ContractorRecord, type WorkRecord } from '../data/api';
 
 // ─── Chart utilities ─────────────────────────────────────────
 
@@ -86,9 +86,32 @@ function LoadingSkeleton({ height = 200, label = 'Loading...' }: { height?: numb
 // ─── Main component ──────────────────────────────────────────
 
 export default function ContractorMatrix() {
+  const { openWorkModal } = useWorkModal();
   const [search, setSearch] = useState('');
   const [chartMode, setChartMode] = useState<'risk' | 'progress'>('risk');
   const [tableFilter, setTableFilter] = useState<'all' | 'high_risk' | 'top_performers' | 'zero_progress'>('all');
+  const [expandedAgency, setExpandedAgency] = useState<string | null>(null);
+  const [agencyWorksMap, setAgencyWorksMap] = useState<Record<string, WorkRecord[]>>({});
+  const [loadingWorks, setLoadingWorks] = useState<Record<string, boolean>>({});
+
+  const toggleExpandContractor = (agencyName: string) => {
+    if (expandedAgency === agencyName) {
+      setExpandedAgency(null);
+      return;
+    }
+    setExpandedAgency(agencyName);
+    if (!agencyWorksMap[agencyName]) {
+      setLoadingWorks(prev => ({ ...prev, [agencyName]: true }));
+      fetchWorks({ search: agencyName, page_size: 50 })
+        .then(res => {
+          setAgencyWorksMap(prev => ({ ...prev, [agencyName]: res.results }));
+        })
+        .catch(err => console.error("Error fetching works for contractor:", err))
+        .finally(() => {
+          setLoadingWorks(prev => ({ ...prev, [agencyName]: false }));
+        });
+    }
+  };
 
   const { data: contractors, loading, error } = useApi(() => fetchContractors(), []);
 
@@ -309,27 +332,89 @@ export default function ContractorMatrix() {
               </thead>
               <tbody className="tbl-body">
                 {filtered.map(c => (
-                  <tr key={c.agency_name} className={c.health === 'High Risk' || c.health === 'DATA_ERROR' ? 'row-danger' : ''}>
-                    <td>
-                      <p className="font-semibold" style={{ color: 'var(--text-1)' }}>{c.agency_name}</p>
-                    </td>
-                    <td><HealthBadge health={c.health} /></td>
-                    <td className="text-right font-semibold" style={{ color: 'var(--text-1)' }}>{c.total_works}</td>
-                    <td className="text-right" style={{ color: 'var(--info)' }}>{c.in_progress}</td>
-                    <td className="text-right" style={{ color: c.delayed > 0 ? 'var(--danger)' : 'var(--text-3)' }}>
-                      {c.delayed}
-                    </td>
-                    <td className="text-right" style={{ color: 'var(--success)' }}>{c.completed}</td>
-                    <td className="text-right font-medium" style={{ color: 'var(--text-1)' }}>
-                      ₹{c.total_expenditure_lacs.toLocaleString()}
-                    </td>
-                    <td className="text-right font-semibold" style={{ color: c.risk_score_avg > 40 ? 'var(--danger)' : 'var(--text-3)' }}>
-                      {c.risk_score_avg.toFixed(1)}
-                    </td>
-                    <td title={c.avg_financial_progress_pct === 0 ? "No expenditure recorded in source sheet. May indicate work not yet started or missing data entry." : undefined}>
-                      <ProgressBar value={c.avg_financial_progress_pct} showLabel />
-                    </td>
-                  </tr>
+                  <React.Fragment key={c.agency_name}>
+                    <tr
+                      onClick={() => toggleExpandContractor(c.agency_name)}
+                      className={`cursor-pointer transition-colors hover:bg-slate-500/10 ${c.health === 'High Risk' || c.health === 'DATA_ERROR' ? 'row-danger' : ''}`}
+                    >
+                      <td>
+                        <div className="flex items-center gap-2">
+                          {expandedAgency === c.agency_name ? <ChevronDown size={14} className="text-blue-400" /> : <ChevronRight size={14} className="text-slate-400" />}
+                          <p className="font-semibold" style={{ color: 'var(--text-1)' }}>{c.agency_name}</p>
+                        </div>
+                      </td>
+                      <td><HealthBadge health={c.health} /></td>
+                      <td className="text-right font-semibold" style={{ color: 'var(--text-1)' }}>{c.total_works}</td>
+                      <td className="text-right" style={{ color: 'var(--info)' }}>{c.in_progress}</td>
+                      <td className="text-right" style={{ color: c.delayed > 0 ? 'var(--danger)' : 'var(--text-3)' }}>
+                        {c.delayed}
+                      </td>
+                      <td className="text-right" style={{ color: 'var(--success)' }}>{c.completed}</td>
+                      <td className="text-right font-medium" style={{ color: 'var(--text-1)' }}>
+                        ₹{c.total_expenditure_lacs.toLocaleString()}
+                      </td>
+                      <td className="text-right font-semibold" style={{ color: c.risk_score_avg > 40 ? 'var(--danger)' : 'var(--text-3)' }}>
+                        {c.risk_score_avg.toFixed(1)}
+                      </td>
+                      <td title={c.avg_financial_progress_pct === 0 ? "No expenditure recorded in source sheet. May indicate work not yet started or missing data entry." : undefined}>
+                        <ProgressBar value={c.avg_financial_progress_pct} showLabel />
+                      </td>
+                    </tr>
+
+                    {/* Expanded Works Sub-Table */}
+                    {expandedAgency === c.agency_name && (
+                      <tr>
+                        <td colSpan={9} className="p-4" style={{ background: 'var(--tbl-head-bg)', borderBottom: '1px solid var(--border)' }}>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between text-[11px] font-semibold" style={{ color: 'var(--text-3)' }}>
+                              <span>Works executed by <strong style={{ color: 'var(--text-1)' }}>{c.agency_name}</strong></span>
+                              <span className="text-[10px] text-blue-400">💡 Click any work row to view full details modal</span>
+                            </div>
+                            {loadingWorks[c.agency_name] ? (
+                              <LoadingSkeleton height={80} label="Loading agency works..." />
+                            ) : (agencyWorksMap[c.agency_name] || []).length > 0 ? (
+                              <div className="overflow-x-auto rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
+                                <table className="w-full text-[11px]">
+                                  <thead className="tbl-head">
+                                    <tr>
+                                      <th className="py-2 px-3 text-left">Work ID</th>
+                                      <th className="py-2 px-3 text-left">Description</th>
+                                      <th className="py-2 px-3 text-left">Status</th>
+                                      <th className="py-2 px-3 text-right">Physical Progress</th>
+                                      <th className="py-2 px-3 text-right">Days Overdue</th>
+                                      <th className="py-2 px-3 text-right">Risk Score</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="tbl-body">
+                                    {(agencyWorksMap[c.agency_name] || []).map(w => (
+                                      <tr
+                                        key={w.work_id}
+                                        onClick={(e) => { e.stopPropagation(); openWorkModal(w.work_id, w); }}
+                                        className="cursor-pointer hover:bg-blue-500/10 transition-colors"
+                                      >
+                                        <td className="py-2 px-3 font-mono font-semibold" style={{ color: 'var(--accent-text)' }}>{w.work_id}</td>
+                                        <td className="py-2 px-3 max-w-md truncate" style={{ color: 'var(--text-1)' }}>{w.work_description || '—'}</td>
+                                        <td className="py-2 px-3">{w.delivery_status || '—'}</td>
+                                        <td className="py-2 px-3 text-right font-mono">{(w.physical_progress_pct ?? 0).toFixed(1)}%</td>
+                                        <td className={`py-2 px-3 text-right font-mono ${(w.days_overdue ?? 0) > 0 ? 'text-red-400 font-bold' : ''}`}>
+                                          {w.days_overdue ?? 0}
+                                        </td>
+                                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: (w.risk_score ?? 0) >= 30 ? 'var(--danger)' : 'var(--success)' }}>
+                                          {w.risk_score ?? 0}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] py-2" style={{ color: 'var(--text-3)' }}>No work records found matching this agency name.</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
                 {filtered.length === 0 && (
                   <tr>

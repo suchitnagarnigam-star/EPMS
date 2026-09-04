@@ -10,6 +10,7 @@ import StageBadge from '../components/StageBadge';
 import RiskBadge from '../components/RiskBadge';
 import ProgressBar from '../components/ProgressBar';
 import MethodologyTooltip from '../components/MethodologyTooltip';
+import { useWorkModal } from '../context/WorkModalContext';
 import { useApi } from '../data/useApi';
 import { fetchKpis, fetchWorks, fetchZones, fetchFundDistribution } from '../data/api';
 import type { KpiData, WorkRecord, ZoneRecord, FundDistributionRecord } from '../data/api';
@@ -90,6 +91,7 @@ function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => vo
 // ─── Main component ──────────────────────────────────────────
 
 export default function ExecutiveOverview() {
+  const { openWorkModal } = useWorkModal();
   const [branch, setBranch] = useState('All');
   const [zone,   setZone]   = useState('All');
   const [search, setSearch] = useState('');
@@ -149,12 +151,17 @@ export default function ExecutiveOverview() {
   const zoneChartData = Object.values(zoneMap);
   const uniqueZones = Object.keys(zoneMap);
 
-  // Fund distribution chart data
-  const fundChartData = (fundDist || []).map((f, i) => ({
-    name: f.fund_type,
-    expenditure: Math.round(f.total_expenditure_lacs * 100) / 100,
-    color: FUND_COLORS[i % FUND_COLORS.length],
-  }));
+  // Fund distribution chart data (filter expenditure > 0 and sort descending)
+  const fundChartData = (fundDist || [])
+    .filter(f => f.total_expenditure_lacs > 0)
+    .sort((a, b) => b.total_expenditure_lacs - a.total_expenditure_lacs)
+    .map((f, i) => ({
+      name: f.fund_type,
+      expenditure: Math.round(f.total_expenditure_lacs * 100) / 100,
+      color: FUND_COLORS[i % FUND_COLORS.length],
+    }));
+
+  const maxZoneVal = Math.max(...zoneChartData.map(d => Math.max(d.BR || 0, d.OM || 0)), 10);
 
   // Critical works (high risk) — filter from results
   const criticalList: WorkRecord[] = (criticalWorks?.results || [])
@@ -250,7 +257,7 @@ export default function ExecutiveOverview() {
         <ResponsiveContainer width="100%" height={height}>
           <BarChart data={zoneChartData} barGap={2} barSize={expandedChart === 'zone' ? 18 : 10}>
             <XAxis dataKey="zone" tick={{ fill: 'var(--chart-text, #505050)', fontSize: expandedChart === 'zone' ? 12 : 10 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: 'var(--chart-text, #505050)', fontSize: expandedChart === 'zone' ? 12 : 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
+            <YAxis tick={{ fill: 'var(--chart-text, #505050)', fontSize: expandedChart === 'zone' ? 12 : 10 }} axisLine={false} tickLine={false} domain={[0, Math.ceil(maxZoneVal * 1.15)]} />
             <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
             <Bar dataKey="BR" fill="#4f6ef7" radius={[3,3,0,0]} name="B&R" activeBar={makeBrightBar('#7b93ff')} />
             <Bar dataKey="OM" fill="#3d9bd4" radius={[3,3,0,0]} name="O&M" activeBar={makeBrightBar('#60b8e8')} />
@@ -414,7 +421,11 @@ export default function ExecutiveOverview() {
               </thead>
               <tbody className="tbl-body">
                 {filtered.map(w => (
-                  <tr key={w.work_id} className={(w.risk_score ?? 0) >= 60 ? 'row-danger' : ''}>
+                  <tr
+                    key={w.work_id}
+                    onClick={() => openWorkModal(w.work_id, w)}
+                    className={`cursor-pointer transition-colors hover:bg-slate-500/10 ${(w.risk_score ?? 0) >= 60 ? 'row-danger' : ''}`}
+                  >
                     <td><span className="font-semibold" style={{ color: 'var(--text-2)' }}>{w.work_id}</span></td>
                     <td style={{ color: 'var(--text-1)', maxWidth: 280 }}>
                       <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>

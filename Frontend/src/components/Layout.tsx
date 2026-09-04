@@ -2,7 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Users, MapPin,
   Star, ChevronDown, Activity, LogOut,
-  Sun, Moon, ShieldAlert,
+  Sun, Moon, ShieldAlert, UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/contractors',    icon: Users,           label: 'Contractors'            },
   { to: '/constituencies', icon: MapPin,          label: 'Constituencies & Wards' },
   { to: '/works',          icon: ClipboardList,   label: 'Works Directory'        },
+  { to: '/officers',       icon: UserCheck,       label: 'Officer Command'        },
   { to: '/flagship',       icon: Star,            label: 'MDF & SASCI Agenda'     },
   { to: '/quality',        icon: ShieldAlert,     label: 'Data Quality'           },
 ];
@@ -22,6 +23,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/contractors':    'Contractor Performance Matrix',
   '/constituencies': 'Constituency & Ward Funds',
   '/works':          'Master Works Directory',
+  '/officers':       'Officer Performance Command',
   '/flagship':       'MDF & SASCI Special Agenda',
   '/quality':        'Data Quality Dashboard',
 };

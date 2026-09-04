@@ -81,7 +81,7 @@ async def process_work_row(conn, row: WorkSyncItem, results: dict):
     agency_id    = await resolve_agency(conn, row)
     fund_id      = await resolve_fund(conn, row)
     work_type_id = await resolve_work_type(conn, row)
-    officer_id   = await resolve_officer(conn, row)
+    officer_id, resolved_officer_ids = await resolve_officer(conn, row)
 
     # ── COMPUTE RISK METRICS ──
     days_overdue = compute_days_overdue(row)
@@ -163,6 +163,17 @@ async def process_work_row(conn, row: WorkSyncItem, results: dict):
         row.source_sheet, row.source_row, row.record_hash, row.data_quality_flags, row.pipeline_version, row.staged_at
     )
 
+    if resolved_officer_ids:
+        for oid in resolved_officer_ids:
+            await conn.execute(
+                """
+                INSERT INTO fact_works_officers (work_id, officer_id)
+                VALUES ($1, $2)
+                ON CONFLICT (work_id, officer_id) DO NOTHING
+                """,
+                work_id, oid
+            )
+
     if result:
         results["upserted"] += 1
     else:
@@ -242,16 +253,74 @@ async def resolve_work_type(conn, row: WorkSyncItem) -> int | None:
         res = await conn.fetchrow("SELECT work_type_id FROM dim_work_type WHERE branch IS NOT DISTINCT FROM $1 AND nature_of_work IS NOT DISTINCT FROM $2", row.branch, row.nature_of_work)
     return res["work_type_id"] if res else None
 
-async def resolve_officer(conn, row: WorkSyncItem) -> int | None:
+import re
+
+def parse_officers(raw_string: str | None) -> list[dict[str, str]]:
+    if not raw_string or not raw_string.strip():
+        return []
+    
+    designations = {"JE", "SDO", "XEN", "EE"}
+    lines = re.split(r'[\r\n,;]+', raw_string)
+    results = []
+    
+    for line in lines:
+        tokens = line.strip().split()
+        if not tokens:
+            continue
+        
+        found_designation = None
+        name_tokens = []
+        
+        for token in tokens:
+            clean_tok = re.sub(r'[^A-Za-z]', '', token).upper()
+            if clean_tok in designations:
+                found_designation = clean_tok
+            else:
+                name_tokens.append(token)
+        
+        name = " ".join(name_tokens).strip()
+        if not name and found_designation:
+            name = found_designation
+            found_designation = "OTHER"
+        elif not name:
+            continue
+            
+        designation = found_designation if found_designation else "OTHER"
+        results.append({"name": name, "designation": designation})
+        
+    return results
+
+
+async def resolve_officer(conn, row: WorkSyncItem) -> tuple[int | None, list[int]]:
     if not row.officer_name:
-        return None
-    res = await conn.fetchrow(
-        "INSERT INTO dim_officer (officer_name) VALUES ($1) ON CONFLICT (officer_name) DO NOTHING RETURNING officer_id",
-        row.officer_name
-    )
-    if not res:
-        res = await conn.fetchrow("SELECT officer_id FROM dim_officer WHERE officer_name = $1", row.officer_name)
-    return res["officer_id"] if res else None
+        return None, []
+    
+    officers = parse_officers(row.officer_name)
+    primary_officer_id = None
+    resolved_officer_ids = []
+
+    for off in officers:
+        res = await conn.fetchrow(
+            """
+            INSERT INTO dim_officer (officer_name, designation)
+            VALUES ($1, $2)
+            ON CONFLICT (officer_name) DO UPDATE SET designation = EXCLUDED.designation
+            RETURNING officer_id
+            """,
+            off["name"], off["designation"]
+        )
+        if not res:
+            res = await conn.fetchrow("SELECT officer_id FROM dim_officer WHERE officer_name = $1", off["name"])
+        if res:
+            oid = res["officer_id"]
+            resolved_officer_ids.append(oid)
+            if off["designation"] == "JE" and primary_officer_id is None:
+                primary_officer_id = oid
+
+    if primary_officer_id is None and resolved_officer_ids:
+        primary_officer_id = resolved_officer_ids[0]
+
+    return primary_officer_id, resolved_officer_ids
 
 
 # ── METRICS ──

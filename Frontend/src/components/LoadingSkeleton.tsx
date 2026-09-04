@@ -33,3 +33,12 @@ export function ChartSkeleton({ height = "h-48" }: { height?: string }) {
     </div>
   );
 }
+
+export default function LoadingSkeleton({ height = 200, label = 'Loading...' }: { height?: number; label?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2" style={{ height, color: 'var(--text-3)' }}>
+      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-[12px]">{label}</span>
+    </div>
+  );
+}

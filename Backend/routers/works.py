@@ -25,6 +25,8 @@ async def get_works(
     delivery_status: Optional[str] = None,
     workflow_stage: Optional[str] = None,
     risk_score_min: Optional[float] = None,
+    officer_id: Optional[int] = None,
+    agency_id: Optional[int] = None,
     search: Optional[str] = None,
     sort_by: Optional[str] = "risk_score",
     sort_order: Optional[str] = "desc",
@@ -62,6 +64,14 @@ async def get_works(
     if risk_score_min is not None:
         params.append(risk_score_min)
         conditions.append(f"F.risk_score >= ${len(params)}")
+
+    if officer_id is not None:
+        params.append(officer_id)
+        conditions.append(f"(F.officer_id = ${len(params)} OR F.work_id IN (SELECT work_id FROM fact_works_officers WHERE officer_id = ${len(params)}))")
+
+    if agency_id is not None:
+        params.append(agency_id)
+        conditions.append(f"F.agency_id = ${len(params)}")
 
     if search:
         params.append(f"%{search}%")

@@ -199,6 +199,21 @@ export function fetchKpis(branch?: string): Promise<KpiData> {
   return apiFetch<KpiData>('/kpis', { branch });
 }
 
+export interface OfficerRecord {
+  officer_id: number;
+  officer_name: string;
+  designation: string;
+  total_works: number;
+  avg_physical_progress: number;
+  avg_financial_progress: number;
+  avg_risk_score: number;
+  total_tender_cost_lacs: number;
+  total_expenditure_lacs: number;
+  completed_count: number;
+  in_progress_count: number;
+  delayed_count: number;
+}
+
 export interface WorksFilters {
   branch?: string;
   zone?: string;
@@ -206,6 +221,8 @@ export interface WorksFilters {
   delivery_status?: string;
   workflow_stage?: string;
   risk_score_min?: number;
+  officer_id?: number;
+  agency_id?: number;
   search?: string;
   sort_by?: string;
   sort_order?: string;
@@ -215,6 +232,10 @@ export interface WorksFilters {
 
 export function fetchWorks(filters: WorksFilters = {}): Promise<WorksResponse> {
   return apiFetch<WorksResponse>('/works', filters as Record<string, string | number | undefined>);
+}
+
+export function fetchOfficers(designation?: string, branch?: string): Promise<OfficerRecord[]> {
+  return apiFetch<OfficerRecord[]>('/kpis/officers', { designation, branch });
 }
 
 export function fetchContractors(): Promise<ContractorRecord[]> {

@@ -354,6 +354,32 @@ function cleanAndNormalize(raw, branch, sourceRow) {
   if (!raw.sub_zone)         flags.push("UNRESOLVED_LOCATION");
   if (!raw.executing_agency) flags.push("MISSING_AGENCY");
 
+  // Additional Quality Flags
+  if (!raw.scheduled_end_date || !raw.start_date) {
+    flags.push("MISSING_DATES");
+  }
+
+  if (!raw.executing_agency || !raw.fund_type || !raw.zone) {
+    flags.push("INCOMPLETE_DATA");
+  }
+
+  if (raw.scheduled_end_date && delivery_status !== "Completed") {
+    let schedEnd = null;
+    if (raw.scheduled_end_date instanceof Date) {
+      schedEnd = raw.scheduled_end_date;
+    } else {
+      const parsed = Date.parse(String(raw.scheduled_end_date));
+      if (!isNaN(parsed)) schedEnd = new Date(parsed);
+    }
+    if (schedEnd) {
+      const now = new Date();
+      const diffDays = Math.floor((now.getTime() - schedEnd.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays > 30) {
+        flags.push("DELAYED");
+      }
+    }
+  }
+
   const toBoolean = (val) => {
     const v = String(val).trim().toLowerCase();
     if (v === "y" || v === "yes") return true;

@@ -246,3 +246,49 @@ async def get_ward_kpis(
     return [dict(r) for r in rows]
 
 
+@router.get("/officers")
+async def get_officer_kpis(
+    designation: Optional[str] = None,
+    branch: Optional[str] = None,
+    conn: Connection = Depends(get_db)
+):
+    conditions = ["o.officer_name IS NOT NULL"]
+    params = []
+
+    if designation and designation.strip() and designation.lower() != 'all':
+        params.append(designation.strip().upper())
+        conditions.append(f"UPPER(COALESCE(o.designation, 'OTHER')) = ${len(params)}")
+
+    if branch and branch.strip() and branch.lower() != 'all':
+        params.append(branch.strip())
+        conditions.append(f"f.branch = ${len(params)}")
+
+    where_clause = " AND ".join(conditions)
+
+    query = f"""
+        SELECT 
+            o.officer_id,
+            o.officer_name,
+            COALESCE(o.designation, 'OTHER') AS designation,
+            COUNT(DISTINCT f.work_id)::integer AS total_works,
+            ROUND(COALESCE(AVG(f.physical_progress_pct), 0)::numeric, 1)::float AS avg_physical_progress,
+            ROUND(COALESCE(AVG(f.financial_progress_pct) FILTER (WHERE f.financial_progress_pct <= 100), 0)::numeric, 1)::float AS avg_financial_progress,
+            ROUND(COALESCE(AVG(f.risk_score), 0)::numeric, 1)::float AS avg_risk_score,
+            ROUND(COALESCE(SUM(f.tender_cost_lacs), 0)::numeric, 2)::float AS total_tender_cost_lacs,
+            ROUND(COALESCE(SUM(f.expenditure_lacs), 0)::numeric, 2)::float AS total_expenditure_lacs,
+            COUNT(DISTINCT CASE WHEN f.delivery_status = 'Completed' THEN f.work_id END)::integer AS completed_count,
+            COUNT(DISTINCT CASE WHEN f.delivery_status = 'In Progress' THEN f.work_id END)::integer AS in_progress_count,
+            COUNT(DISTINCT CASE WHEN f.delivery_status = 'Delayed/Held Up' OR f.days_overdue > 30 THEN f.work_id END)::integer AS delayed_count
+        FROM dim_officer o
+        LEFT JOIN fact_works_officers fwo ON o.officer_id = fwo.officer_id
+        LEFT JOIN fact_works f ON (fwo.work_id = f.work_id OR f.officer_id = o.officer_id)
+        WHERE {where_clause}
+        GROUP BY o.officer_id, o.officer_name, o.designation
+        HAVING COUNT(DISTINCT f.work_id) > 0
+        ORDER BY total_works DESC, o.officer_name ASC
+    """
+    rows = await conn.fetch(query, *params)
+    return [dict(r) for r in rows]
+
+
+

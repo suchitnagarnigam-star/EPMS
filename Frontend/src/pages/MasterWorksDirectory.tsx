@@ -1,17 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Download, ChevronLeft, ChevronRight, Loader2, ArrowUpDown } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Download, ChevronLeft, ChevronRight, Loader2, ArrowUpDown, X } from 'lucide-react';
 import StageBadge from '../components/StageBadge';
 import RiskBadge from '../components/RiskBadge';
 import ProgressBar from '../components/ProgressBar';
 import MethodologyTooltip from '../components/MethodologyTooltip';
-import WorkDetailModal from '../components/WorkDetailModal';
+import { useWorkModal } from '../context/WorkModalContext';
 import { useApi } from '../data/useApi';
-import { fetchWorks, type WorkRecord } from '../data/api';
+import { fetchWorks } from '../data/api';
 
 const PAGE_SIZE = 25;
 
 export default function MasterWorksDirectory() {
-  const [selectedWork, setSelectedWork] = useState<WorkRecord | null>(null);
+  const { openWorkModal } = useWorkModal();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const officerIdParam = searchParams.get('officer_id');
+  const officerId = officerIdParam ? parseInt(officerIdParam) : undefined;
+
   const [search,    setSearch]    = useState('');
   const [branch,    setBranch]    = useState('All');
   const [zone,      setZone]      = useState('All');
@@ -43,6 +48,12 @@ export default function MasterWorksDirectory() {
     setPage(1);
   }
 
+  function clearOfficerFilter() {
+    searchParams.delete('officer_id');
+    setSearchParams(searchParams);
+    setPage(1);
+  }
+
   // Fetch from API with server-side filtering + sorting + pagination
   const { data, loading, error } = useApi(
     () => fetchWorks({
@@ -50,13 +61,14 @@ export default function MasterWorksDirectory() {
       zone: zone === 'All' ? undefined : zone,
       delivery_status: status === 'All' ? undefined : status,
       workflow_stage: stage === 'All' ? undefined : stage,
+      officer_id: officerId,
       search: debouncedSearch || undefined,
       sort_by: sortBy,
       sort_order: sortOrder,
       page,
       page_size: PAGE_SIZE,
     }),
-    [branch, zone, status, stage, debouncedSearch, sortBy, sortOrder, page]
+    [branch, zone, status, stage, officerId, debouncedSearch, sortBy, sortOrder, page]
   );
 
   const total = data?.total ?? 0;
@@ -105,6 +117,18 @@ export default function MasterWorksDirectory() {
           <Download size={13} /> Export CSV
         </button>
       </div>
+
+      {/* Active Officer Filter Banner */}
+      {officerId && (
+        <div className="card p-3.5 flex items-center justify-between text-[12px]" style={{ background: 'var(--accent-dim)', borderColor: 'var(--accent)' }}>
+          <span style={{ color: 'var(--text-1)' }}>
+            Filtering works assigned to Officer ID: <strong style={{ color: 'var(--accent-text)' }}>{officerId}</strong>
+          </span>
+          <button onClick={clearOfficerFilter} className="btn-ghost py-1 px-2.5 text-[11px] flex items-center gap-1.5">
+            <X size={13} /> Clear Officer Filter
+          </button>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (
@@ -207,7 +231,7 @@ export default function MasterWorksDirectory() {
                 {results.map(w => (
                   <tr
                     key={w.work_id}
-                    onClick={() => setSelectedWork(w)}
+                    onClick={() => openWorkModal(w.work_id, w)}
                     className="cursor-pointer transition-colors hover:bg-slate-500/10"
                   >
                     <td><span className="font-semibold" style={{ color: 'var(--text-1)' }}>{w.work_id}</span></td>
@@ -285,9 +309,6 @@ export default function MasterWorksDirectory() {
           </div>
         </div>
       </div>
-
-      {/* Work Detail Modal */}
-      <WorkDetailModal work={selectedWork} onClose={() => setSelectedWork(null)} />
 
     </div>
   );
