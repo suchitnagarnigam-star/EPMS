@@ -64,8 +64,8 @@ Main Tracker (B&R / O&M tabs)
 - All tables deployed: `fact_works`, `dim_location`, `dim_agency`, `dim_fund`, `dim_work_type`, `dim_officer`, `fact_works_officers`, `dashboard_users`, `data_quality`, `sasci_mdf_works`.
 - Indexes, constraints, and `update_updated_at` trigger active.
 - **Junction Table & Officers Schema**:
-  - `dim_officer`: Stores parsed officer entries (`officer_id`, `officer_name`, `designation`, `branch`).
-  - `fact_works_officers`: Junction table for multi-officer assignments (`work_id`, `officer_id`).
+  - `dim_officer`: Stores 61 clean individual officer entries (`officer_id`, `officer_name`, `designation`, `branch`).
+  - `fact_works_officers`: Junction table for 1,466 multi-officer assignments (`work_id`, `officer_id`).
   - `fact_works.ai_remarks`: Added text column for AI summaries/insights.
 - **Column size fixes applied** (all via `ALTER TABLE`):
   - `dim_location.sub_zone`: varchar(10) → 100
@@ -92,9 +92,11 @@ Main Tracker (B&R / O&M tabs)
 
 ### Phase 3 — FastAPI Backend (`sync.py` and routers)
 - Asyncpg pool with Neon SSL compatibility.
-- **Multi-Officer Parsing (`parse_officers()`)**:
-  - Parses multi-officer strings containing roles (`JE`, `SDO`, `XEN`, `EE`, `OTHER`).
-  - Upserts distinct officer names into `dim_officer`, updates primary officer FK `fact_works.officer_id`, and populates `fact_works_officers` junction table.
+- **Advanced Multi-Officer Parsing (`parse_officers()`)**:
+  - Multi-delimiter pre-processing (`/`, `-XEN`, `-SDO`, `-JE`, `,`, `;`, `and`, `&`) and surname boundary splitting (`Singh`, `Sharma`, `Sethi`, `Pathak`, `Ram`, `Garcha`, `Kumar`, `Juneja`, `Sikka`, `Grewal`, `Sodhi`, `Kaur`).
+  - Upserts 61 distinct clean officer names into `dim_officer`, updates primary officer FK `fact_works.officer_id` (448 works linked), and populates `fact_works_officers` junction table (1,466 assignments).
+- **Pydantic Alias Fix (`Backend/models.py`)**:
+  - Added `'supervising_officer'` to `AliasChoices` in `WorkSyncItem` to ensure payload ingestion maps officer data from GAS sync payloads seamlessly.
 - **Synthetic ID Reconciliation**: Upgrades `OM-ROW-X` to real project IDs without duplicating history.
 - `GET /kpis/officers`: Provides aggregate metrics per officer filtered by designation or branch.
 - `GET /works/{work_id}`: Dedicated detail endpoint for single work lookup.
@@ -106,8 +108,15 @@ Main Tracker (B&R / O&M tabs)
 
 ### Phase 6 — React Dashboard & Sprints 1–4 Enhancements
 - Full frontend dashboard built using React, Vite, Tailwind CSS, Recharts.
+- **Officer Performance Command (`OfficerCommand.tsx`)**:
+  - Completely redesigned to 100% mirror the layout and features of `ContractorMatrix.tsx`.
+  - 4 KPI summary cards (Healthy, Moderate Workload, High Risk, Unassigned).
+  - Interactive Recharts Top 20 bar chart with segmented toggle (🔴 Top 20 by Risk / 🟢 Top 20 by Progress).
+  - Master Directory table with designation tabs (`All`, `JE`, `SDO`, `XEN`, `EE`), search input, and export button.
+  - Health rating badges (`Healthy`, `Moderate`, `High Risk`).
+  - Two-level expandable works sub-table with click-to-modal triggers (`useWorkModal().openWorkModal`).
 - **Global WorkModal Context (`WorkModalContext.tsx`)**: Application-wide provider to trigger `WorkDetailModal` from any component/table row via `useWorkModal().openWorkModal(workId)`. Fetches fresh record on demand via `GET /works/{work_id}`.
-- **Officer Command Dashboard (`OfficerCommand.tsx`)**: Interactive officer tracking page with performance cards, designation tabs (`JE`, `SDO`, `XEN`, `EE`, `All`), search filter, risk badges, and direct drill-through links to Works Directory.
+- **WorkDetailModal Risk Ring UI Polish**: Dynamically scaled font sizes (`text-[12px]`, `text-[14px]`, `text-[18px]`) based on score string length, preventing text overflow and vertical overlap inside the SVG risk circle.
 - **Contractor Matrix Drilldown (`ContractorMatrix.tsx`)**: Two-level drilldown (Contractor list → Inline expanded works using exact `agency_name` filter → Work detail modal).
 - **Executive Overview Enhancements (`ExecutiveOverview.tsx`)**: Clickable high-risk rows, dynamic Y-axis calculation for Zone chart (`maxZoneVal * 1.15`), filtered 0-expenditure fund types sorted by spend.
 - **Master Works Directory (`MasterWorksDirectory.tsx`)**: Integrated global modal context and added banner notification for `officer_id` URL query filter.
@@ -126,8 +135,8 @@ Main Tracker (B&R / O&M tabs)
 | `dim_agency` | 264 | |
 | `dim_fund` | 51 | |
 | `dim_work_type` | — | |
-| `dim_officer` | Active | Populates on next sync via `parse_officers()` |
-| `fact_works_officers` | Active | Junction table linking multi-officer assignments |
+| `dim_officer` | 61 | Clean individual officer records (`JE`, `SDO`, `XEN`, `EE`, `SE`) |
+| `fact_works_officers` | 1,466 | Junction table linking multi-officer assignments |
 | `dashboard_users` | Active | Admin & user email access management table |
 | `data_quality` | Active | Unique constraint `(source_sheet, source_row, flags)` applied |
 | `sasci_mdf_works` | 0 | Phase 5 pending |
@@ -137,25 +146,23 @@ Main Tracker (B&R / O&M tabs)
 ## 6. Open Bugs & Resolved Issues
 
 ### Resolved Issues ✅
-1. **Empty Officers Dropdown / Drilldown**: Added `parse_officers()` logic in `sync.py`, created `dim_officer` and `fact_works_officers` schema, and built `GET /kpis/officers`.
-2. **Contractor Works Count Mismatch**: Replaced broad text `search` with exact `agency_name` filter in `GET /works`.
-3. **MCL-0357 Bad Date / Risk Score Spike**: Fixed via regex string cleaning and Year ≥ 2000 date guard in `parse_date_safe`.
-4. **Tooltip Popover Clipping**: Solved by portaling tooltips to `document.body` via `createPortal`.
-5. **Data Quality Duplicate Accumulation**: Unique constraint applied to `data_quality`.
-
-### Pending Items 🔄
-1. **Officer Data Ingestion Run**: Trigger/run next GAS sync to execute `parse_officers()` across existing 1,120 works and populate `dim_officer` and `fact_works_officers`.
-2. **Executive Overview Filter Audit**: Ensure all custom filter hooks wrap dashboard summary cards and chart endpoints consistently.
+1. **Officer Multi-Name Concatenation & Empty Officers Tab**: Updated `parse_officers()` to split multi-officer strings cleanly by delimiter and surname boundary, added `supervising_officer` Pydantic alias, and completed DB migration (61 clean officers, 1,466 junction rows).
+2. **Officer Command UI Redesign**: Redesigned `OfficerCommand.tsx` to 100% mirror `ContractorMatrix.tsx` (KPI cards, Top 20 bar chart, health badges, segmented tabs, expandable works sub-tables).
+3. **Modal Risk Score UI Overlap**: Dynamically scaled font sizes (`text-[12px]`, `text-[14px]`, `text-[18px]`) in `WorkDetailModal.tsx` SVG ring.
+4. **Contractor Works Count Mismatch**: Replaced broad text `search` with exact `agency_name` filter in `GET /works`.
+5. **MCL-0357 Bad Date / Risk Score Spike**: Fixed via regex string cleaning, Year ≥ 2000 date guard in `parse_date_safe`, and database cleanup for pre-guard date artifacts (`1900-01-10`).
+6. **Tooltip Popover Clipping**: Solved by portaling tooltips to `document.body` via `createPortal`.
+7. **Data Quality Duplicate Accumulation**: Unique constraint applied to `data_quality`.
 
 ---
 
 ## 7. Key Architecture Decisions & Gotchas
 
+- **Officer Multi-Delimiter Parsing**: Officer strings contain slashes, hyphens, and unpunctuated multi-person names. Surnames (`Singh`, `Sharma`, `Sethi`, `Pathak`, `Ram`, `Garcha`, `Kumar`, `Juneja`, `Sikka`, `Grewal`, `Sodhi`, `Kaur`) act as natural name boundaries.
 - **Global Work Detail Modal**: Uses `WorkModalContext` to decouple modal state from individual table components. Modal fetches single work data on demand using `GET /works/{work_id}`.
-- **Exact Agency Matching**: Searching by agency name in query parameters uses `agency_name` exact match rather than `search` text search to prevent partial string collisions across contractors.
-- **React Portals for Floating UI**: Floating popovers/tooltips must use `createPortal(..., document.body)` with `fixed` positioning and `getBoundingClientRect()` to prevent clipping inside cards.
+- **Exact Agency & Officer Matching**: Searching by agency or officer uses exact IDs/names rather than broad text search to prevent substring collisions.
+- **React Portals for Floating UI**: Floating popovers/tooltips must use `createPortal(..., document.body)` with `fixed` positioning and `getBoundingClientRect()`.
 - **Date Validation Rule**: Any date parsed before year 2000 is rejected in `models.py` as Excel serial date corruption (`10/01/1900`).
-- **`DEALLOCATE ALL`**: Must be run against Neon after any `ALTER TABLE` column-size change.
 
 ---
 

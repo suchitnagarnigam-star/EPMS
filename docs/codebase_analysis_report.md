@@ -18,8 +18,8 @@ A direct database audit against the Neon PostgreSQL instance (`neondb` on Singap
 | `dim_agency` | Dimension | 264 | Contractors and executing agency records. |
 | `dim_fund` | Dimension | 51 | Funding sources and allocation quota labels. |
 | `dim_work_type` | Dimension | Active | Branch mapping (B&R vs. O&M) and nature of work classification. |
-| `dim_officer` | Dimension | Active | Supervising officer records (`officer_id`, `officer_name`, `designation`, `branch`). Populated via `parse_officers()`. |
-| `fact_works_officers` | Junction | Active | Junction table linking multi-officer assignments (`work_id`, `officer_id`) per work order. |
+| `dim_officer` | Dimension | 61 | Clean individual supervising officer records (`officer_id`, `officer_name`, `designation`, `branch`). |
+| `fact_works_officers` | Junction | 1,466 | Junction table linking multi-officer assignments (`work_id`, `officer_id`) per work order. |
 | `dashboard_users` | Security | Active | Admin & dashboard user access email management. |
 | `data_quality` | Audit Log | Active | Quarantined rows & ingestion anomaly flags (`source_sheet`, `source_row`, `flags`). |
 | `sasci_mdf_works` | Fact Table | 0 | Special km-based road flagship projects tab (**Phase 5 Ingestion Pending**). |
@@ -65,12 +65,13 @@ Main Tracker (B&R / O&M tabs)
 
 ### A. Database & Storage Layer
 - **Star Schema Implementation**: Deployed relational Star Schema with FK relationships and automated `update_updated_at` trigger.
-- **Multi-Officer Junction Architecture**: Added `fact_works_officers` junction table to map multiple supervising officers (`JE`, `SDO`, `XEN`, `EE`, `OTHER`) to individual works.
+- **Multi-Officer Junction Architecture**: Added `fact_works_officers` junction table to map multiple supervising officers (`JE`, `SDO`, `XEN`, `EE`, `SE`) to individual works. Clean migration completed (61 officers, 1,466 junction links).
 - **Asyncpg Connection Pooling**: Handled SSL requirement (`sslmode=require`) for Neon PostgreSQL serverless instances.
 - **SQL Sanitization**: Enforced normalized constituency and zone lookups using `INITCAP(TRIM())` to prevent string casing duplication.
 
 ### B. ETL & Webhook Synchronization
 - **GAS Automated Scheduler**: Overwrite-mode Google Apps Script engine (`code.gs`) processing 45+ columns from B&R and O&M tabs.
+- **Pydantic Alias Mapping**: Added `'supervising_officer'` to `AliasChoices` in `WorkSyncItem` (`Backend/models.py`) so payload ingestion automatically parses officer names from GAS pushes.
 - **Expanded Quality Anomaly Flags**:
   - Added `DELAYED` flag: Fires when scheduled end date is > 30 days past and physical progress is < 100%.
   - Added `MISSING_DATES` flag: Fires when start date or end date is blank.
@@ -80,7 +81,7 @@ Main Tracker (B&R / O&M tabs)
 - **Expenditure Anomaly Guard**: Auto-converts accidental Rupee entries (where expenditure > tender cost × 2) to Lacs and flags `EXPENDITURE_CONVERTED_FROM_RUPEES`.
 
 ### C. Backend API Services (`Backend/routers/`)
-- **Multi-Officer Ingestion Engine (`sync.py`)**: `parse_officers()` parses multi-officer cell strings into individual officer names and designations (`JE`, `SDO`, `XEN`, `EE`, `OTHER`), upserts into `dim_officer`, links primary `officer_id` in `fact_works`, and inserts into `fact_works_officers`.
+- **Advanced Multi-Officer Ingestion Engine (`sync.py`)**: `parse_officers()` processes multi-delimiter officer strings (`/`, `-XEN`, `-SDO`, `-JE`, `,`, `;`, `and`, `&`) and surname boundaries (`Singh`, `Sharma`, `Sethi`, `Pathak`, `Ram`, `Garcha`, `Kumar`, `Juneja`, `Sikka`, `Grewal`, `Sodhi`, `Kaur`), upserting clean officer names into `dim_officer` and linking 1,466 assignments in `fact_works_officers`.
 - **`/kpis/officers` Endpoint**: Exposes officer performance aggregates (total works, total expenditure, average physical progress, risk score distribution) with designation and branch filtering.
 - **`/works` Endpoint & Filters**: Paginated query support with server-side multi-column search (`work_description`, `work_id`, `agency_name`), branch/zone/constituency filtering, exact `agency_name` matching, `officer_id` filtering, and dynamic sorting.
 - **`/works/{work_id}` Dedicated Endpoint**: Fetches a single complete work record by ID for detail view modals.
@@ -90,13 +91,19 @@ Main Tracker (B&R / O&M tabs)
 - **Date Sanitization Guard**: Patched `parse_date_safe` in `models.py` with regex string parsing and a **Year ≥ 2000 guard** to reject Excel serial date corruptions (`10/01/1900`).
 
 ### D. Frontend Dashboard & User Interface (`Frontend/src/`)
+- **Officer Performance Command Redesign (`OfficerCommand.tsx`)**:
+  - Redesigned to 100% mirror `ContractorMatrix.tsx` layout and feature set.
+  - 4 KPI summary cards (Healthy, Moderate Workload, High Risk, Unassigned).
+  - Interactive Recharts Top 20 bar chart with segmented toggle (🔴 Top 20 by Risk / 🟢 Top 20 by Progress).
+  - Master Directory table with designation tabs (`All`, `JE`, `SDO`, `XEN`, `EE`), search filter, and export button.
+  - Health rating badges (`Healthy`, `Moderate`, `High Risk`).
+  - Two-level expandable works sub-table with click-to-modal triggers (`useWorkModal().openWorkModal`).
 - **Global WorkModal Context (`WorkModalContext.tsx`)**: Decoupled modal provider wrapping the application, enabling any component or table row across all pages to open `WorkDetailModal` by calling `useWorkModal().openWorkModal(workId)`. Fetches on-demand work details via `GET /works/{work_id}`.
-- **Officer Command Dashboard (`OfficerCommand.tsx`)**: Full supervising officer analytics dashboard featuring workload KPI summary cards, designation tabs (`JE`, `SDO`, `XEN`, `EE`, `All`), search filter, risk level badges, and direct navigation links to the Works Directory filtered by `officer_id`.
+- **WorkDetailModal Risk Ring UI Polish**: Dynamically scaled font sizes (`text-[12px]`, `text-[14px]`, `text-[18px]`) based on score string length, preventing text overflow and vertical overlap inside the SVG risk circle.
 - **Contractor Matrix Drilldown (`ContractorMatrix.tsx`)**: Two-level drilldown interface (Contractor list → Inline expanded works list using exact `agency_name` filter → Work detail modal on row click).
 - **Executive Overview Enhancements**: High-risk work rows rendered clickable (triggering detail modal), compressed Y-axis calculation for Zone chart (`maxZoneVal * 1.15`), and zero-spend fund types excluded and sorted by expenditure.
 - **Master Works Directory (`MasterWorksDirectory.tsx`)**: Row clicks wired to `WorkModalContext` and added filter banner for `officer_id` URL query parameters.
 - **Dynamic API Base URL Routing (`apiConfig.ts`)**: Automatically targets `http://localhost:8000` during local DEV (`import.meta.env.DEV`) and Render in production.
-- **WorkDetailModal (`WorkDetailModal.tsx`)**: 7-Section frosted glass layout with identity, financial stat grid, SVG Risk Score Ring with driving factors, timeline, and data quality flags.
 - **React Portal Methodology Tooltips (`MethodologyTooltip.tsx`)**: Refactored tooltips to render directly to `document.body` via `React.createPortal` with dynamic viewport positioning (`getBoundingClientRect()`), guaranteeing zero popover clipping inside parent cards with `overflow: hidden`.
 - **Dual Theme System**: Tactile Dark Mode (default) & Warm Beige Light Theme (`[data-theme="light"]`) with stone typography (`#1c1917`), warm indigo accents (`#3551e0`), and custom badge contrast rules.
 
@@ -104,38 +111,40 @@ Main Tracker (B&R / O&M tabs)
 
 ## 4. Resolved Bugs & Anomalies Register
 
-All 13 identified bugs and anomalies have been **100% RESOLVED**:
+All 14 identified bugs and anomalies have been **100% RESOLVED**:
 
 ### 🚨 Critical / High Severity
 1. **Bug 1: Ingestion Data Loss due to Pydantic Alias Mismatches**
-   - *Fix*: Added `AliasChoices` for `officer_name` and `actual_completion_date` in `models.py`.
+   - *Fix*: Added `AliasChoices` for `officer_name` (`supervising_officer`) and `actual_completion_date` in `models.py`.
 2. **Bug 2: Broken Debounced Search in Master Directory**
    - *Fix*: Refactored debounced search using `useEffect` hook timer cleanup in `MasterWorksDirectory.tsx`.
 3. **Bug 3: Backend Search Limit to Description Only**
    - *Fix*: Expanded SQL WHERE clauses to search across `work_description`, `work_id`, and `agency_name` in `routers/works.py`.
 4. **Bug 10: Excel Serial Date Corruption (Bad Date / Risk Score Spike)**
    - *Fix*: Added string regex parsing and Year ≥ 2000 date guard in `parse_date_safe` in `models.py` (resolving artificial risk spikes like MCL-0357).
-5. **Bug 13: Empty Officers Tab & Multi-Officer Cell Ignored**
-   - *Fix*: Built `parse_officers()` string parser, created `dim_officer` & `fact_works_officers` junction table schema, and deployed `GET /kpis/officers`.
+5. **Bug 13: Empty Officers Tab & Multi-Officer Concatenation**
+   - *Fix*: Built `parse_officers()` delimiter and surname boundary parser, created `dim_officer` & `fact_works_officers` junction table schema, added `supervising_officer` alias, and executed DB migration (61 clean officers, 1,466 junction rows).
+6. **Bug 14: Risk Score Text Overlap in Modal SVG Ring**
+   - *Fix*: Dynamically scaled font size (`text-[12px]`, `text-[14px]`, `text-[18px]`) and adjusted line height in `WorkDetailModal.tsx`.
 
 ### ⚠️ Medium Severity
-6. **Bug 4: Contractor Dashboard Chart Ignores Filters**
+7. **Bug 4: Contractor Dashboard Chart Ignores Filters**
    - *Fix*: Bound Recharts data mapping to the filtered dataset in `ContractorMatrix.tsx`.
-7. **Bug 5: Identical Colors for Physical and Financial Progress on SASCI Works**
+8. **Bug 5: Identical Colors for Physical and Financial Progress on SASCI Works**
    - *Fix*: Assigned separate color variables for Physical and Financial progress bars in `FlagshipAgenda.tsx`.
-8. **Bug 6: Immediate Logout on Page Refresh (Session Loss)**
+9. **Bug 6: Immediate Logout on Page Refresh (Session Loss)**
    - *Fix*: Persisted authentication token in `localStorage`/`sessionStorage` via `AuthContext.tsx`.
-9. **Bug 11: Tooltip Popover Clipping Inside Cards**
-   - *Fix*: Portaled tooltips to `document.body` via `createPortal` in `MethodologyTooltip.tsx`.
-10. **Bug 12: Data Quality Duplicate Accumulation**
+10. **Bug 11: Tooltip Popover Clipping Inside Cards**
+    - *Fix*: Portaled tooltips to `document.body` via `createPortal` in `MethodologyTooltip.tsx`.
+11. **Bug 12: Data Quality Duplicate Accumulation**
     - *Fix*: Applied unique constraint `(source_sheet, source_row, flags)` on `data_quality` table.
 
 ### ℹ️ Low Severity / Visual Anomalies
-11. **Bug 7: Global Layout Search Input Non-Functional**
+12. **Bug 7: Global Layout Search Input Non-Functional**
     - *Fix*: Connected search input state to global navigation router.
-12. **Bug 8: Duplicate Sync Status API Calls**
+13. **Bug 8: Duplicate Sync Status API Calls**
     - *Fix*: Cached sync state at `Layout.tsx` level.
-13. **Bug 9: Budget Rounding Loss in Constituency Charts**
+14. **Bug 9: Budget Rounding Loss in Constituency Charts**
     - *Fix*: Preserved decimal precision using `Number((... / 100).toFixed(2))` in `ConstituencyFunds.tsx`.
 
 ---
@@ -161,9 +170,6 @@ Two separate auth concerns:
 - `dashboard_users` table and `/admin/users` CRUD already built.
 - Remaining: JWT token issuance on login, token verification middleware on protected routes, React login page + `AuthContext` token persistence (`localStorage`).
 - All civil servant-facing pages should sit behind auth guard.
-
-### Operational Pending Item
-- **Trigger Ingestion Sync for Officers**: Run/trigger next GAS sync to execute `parse_officers()` across existing 1,120 works in `fact_works` to populate `dim_officer` and `fact_works_officers`.
 
 ### Longer Horizon
 - **LLM natural language query interface**: `POST /ask` endpoint over works data — identified as highest-value LLM entry point.
