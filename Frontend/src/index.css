@@ -58,56 +58,56 @@
   --mesh-b: rgba(52, 211, 153, 0.08);
 }
 
-/* ── LIGHT THEME (WARM BEIGE & RICH STONE CONTRAST) ── */
+/* ── LIGHT THEME (SOOTHING SLATE & MODERN BLUE) ── */
 [data-theme="light"] {
-  --bg:              #f5f2eb; /* Warm beige backdrop */
-  --surface:         #fcfbf9;
+  --bg:              #f8fafc; /* Slate 50 clean, soothing backdrop */
+  --surface:         #ffffff;
   --card:            #ffffff;
-  --card-alt:        #eee8dc;
-  --border:          #e2dcd2;
-  --border-subtle:   #eae4d9;
-  --hover:           #eee7db;
+  --card-alt:        #f1f5f9; /* Slate 100 */
+  --border:          #e2e8f0; /* Slate 200 */
+  --border-subtle:   #f1f5f9;
+  --hover:           #f1f5f9;
 
-  --text-1:          #1c1917; /* Stone 900 warm dark */
-  --text-2:          #44403c; /* Stone 700 */
-  --text-3:          #78716c; /* Stone 500 */
-  --text-4:          #a8a29e; /* Stone 400 */
-  --chart-text:      #57534e; /* Stone 600 for Recharts ticks */
+  --text-1:          #0f172a; /* Slate 900 */
+  --text-2:          #334155; /* Slate 700 */
+  --text-3:          #64748b; /* Slate 500 */
+  --text-4:          #94a3b8; /* Slate 400 */
+  --chart-text:      #475569; /* Slate 600 */
 
-  --accent:          #3551e0; /* Warm royal indigo */
-  --accent-dim:      #eef2ff;
-  --accent-hover:    #253cb5;
-  --accent-text:     #2840c8;
+  --accent:          #3b82f6; /* Modern Blue 500 */
+  --accent-dim:      #eff6ff; /* Blue 50 */
+  --accent-hover:    #2563eb; /* Blue 600 */
+  --accent-text:     #1d4ed8; /* Blue 700 */
 
-  --success:         #047857; /* Warm deep emerald */
-  --success-bg:      #e6f4ed;
-  --warn:            #d97706; /* Warm amber gold */
-  --warn-bg:         #fef3c7;
-  --danger:          #b91c1c; /* Warm crimson red */
-  --danger-bg:       #fee2e2;
-  --info:            #0369a1; /* Deep warm sky */
-  --info-bg:         #e0f2fe;
+  --success:         #059669; /* Emerald 600 */
+  --success-bg:      #ecfdf5;
+  --warn:            #d97706; /* Amber 600 */
+  --warn-bg:         #fffbeb;
+  --danger:          #dc2626; /* Red 600 */
+  --danger-bg:       #fef2f2;
+  --info:            #0284c7; /* Sky 600 */
+  --info-bg:         #f0f9ff;
 
   --input-bg:        #ffffff;
-  --input-border:    #d8d0c5;
-  --input-focus:     #3551e0;
+  --input-border:    #cbd5e1; /* Slate 300 */
+  --input-focus:     #3b82f6;
   --select-bg:       #ffffff;
 
-  --scrollbar:       #d8d0c5;
-  --scrollbar-hover: #a8a29e;
+  --scrollbar:       #cbd5e1;
+  --scrollbar-hover: #94a3b8;
 
-  --sidebar-bg:      #f7f4ed;
-  --topbar-bg:       #faf8f4;
-  --tbl-head-bg:     #eae3d5;
-  --tbl-row-border:  #e2dcd2;
+  --sidebar-bg:      #ffffff;
+  --topbar-bg:       rgba(255, 255, 255, 0.90);
+  --tbl-head-bg:     #f8fafc;
+  --tbl-row-border:  #e2e8f0;
 
-  --glass-bg:        #ffffff;
-  --glass-border:    #e2dcd2;
-  --glass-shadow:    0 1px 3px 0 rgb(60 50 40 / 0.08), 0 1px 2px -1px rgb(60 50 40 / 0.08);
-  --glass-shadow-lg: 0 10px 15px -3px rgb(60 50 40 / 0.1), 0 4px 6px -4px rgb(60 50 40 / 0.08);
+  --glass-bg:        rgba(255, 255, 255, 0.90);
+  --glass-border:    #e2e8f0;
+  --glass-shadow:    0 4px 20px rgba(15, 23, 42, 0.05);
+  --glass-shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.08);
 
-  --mesh-a: rgba(217, 119, 6, 0.08);
-  --mesh-b: rgba(59, 82, 212, 0.05);
+  --mesh-a: rgba(59, 130, 246, 0.06);
+  --mesh-b: rgba(16, 185, 129, 0.04);
 }
 
 /* Fallback override for inline legacy hardcoded dark styles in Light Mode */

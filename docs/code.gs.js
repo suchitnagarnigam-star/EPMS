@@ -354,8 +354,21 @@ function cleanAndNormalize(raw, branch, sourceRow) {
   if (!raw.sub_zone)         flags.push("UNRESOLVED_LOCATION");
   if (!raw.executing_agency) flags.push("MISSING_AGENCY");
 
+  // Start Date Fallback from Work Order Date
+  let effective_start_date = raw.start_date;
+  if ((!effective_start_date || effective_start_date === "-" || String(effective_start_date).trim() === "") && raw.work_order_no_date) {
+    const match = String(raw.work_order_no_date).match(/\b(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})\b/);
+    if (match) {
+      const day = match[1].padStart(2, "0");
+      const month = match[2].padStart(2, "0");
+      let year = match[3];
+      if (year.length === 2) year = "20" + year;
+      effective_start_date = `${year}-${month}-${day}`;
+    }
+  }
+
   // Additional Quality Flags
-  if (!raw.scheduled_end_date || !raw.start_date) {
+  if (!raw.scheduled_end_date || !effective_start_date) {
     flags.push("MISSING_DATES");
   }
 

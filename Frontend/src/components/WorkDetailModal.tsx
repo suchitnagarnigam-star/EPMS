@@ -75,11 +75,6 @@ export default function WorkDetailModal({ work, onClose }: WorkDetailModalProps)
     return 'badge-neutral';
   };
 
-  // SVG parameters for Risk Score Ring
-  const radius = 34;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (Math.min(100, Math.max(0, riskScore)) / 100) * circumference;
-
   return (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 transition-opacity duration-200 ${
@@ -315,7 +310,18 @@ export default function WorkDetailModal({ work, onClose }: WorkDetailModalProps)
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div>
                     <span style={{ color: 'var(--text-3)' }}>Start Date: </span>
-                    <span className="font-mono">{work.start_date || '—'}</span>
+                    <span className="font-mono">
+                      {work.start_date && work.start_date.trim() && work.start_date !== '-' ? (
+                        work.start_date
+                      ) : work.work_order_no_date && work.work_order_no_date.match(/\b(\d{1,4}[-./]\d{1,2}[-./]\d{1,4})\b/) ? (
+                        <>
+                          {work.work_order_no_date.match(/\b(\d{1,4}[-./]\d{1,2}[-./]\d{1,4})\b/)?.[1]}
+                          <span className="text-[10px] text-blue-400 font-sans ml-1">(WO Date)</span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </span>
                   </div>
                   <div>
                     <span style={{ color: 'var(--text-3)' }}>Sched. End: </span>
@@ -336,24 +342,23 @@ export default function WorkDetailModal({ work, onClose }: WorkDetailModalProps)
               {/* Score Ring */}
               <div className="flex flex-col items-center justify-center shrink-0">
                 <div className="relative w-24 h-24 flex items-center justify-center">
-                  <svg className="w-full h-full transform -rotate-90">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 96 96">
                     <circle
                       cx="48"
                       cy="48"
-                      r={radius}
-                      stroke="currentColor"
-                      strokeWidth="7"
-                      className="text-slate-700/30"
+                      r="36"
+                      stroke="var(--border)"
+                      strokeWidth="6"
                       fill="transparent"
                     />
                     <circle
                       cx="48"
                       cy="48"
-                      r={radius}
+                      r="36"
                       stroke={riskColor}
-                      strokeWidth="7"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={strokeDashoffset}
+                      strokeWidth="6"
+                      strokeDasharray={2 * Math.PI * 36}
+                      strokeDashoffset={(2 * Math.PI * 36) - (Math.min(100, Math.max(0, riskScore)) / 100) * (2 * Math.PI * 36)}
                       strokeLinecap="round"
                       fill="transparent"
                       className="transition-all duration-500 ease-out"
@@ -361,13 +366,13 @@ export default function WorkDetailModal({ work, onClose }: WorkDetailModalProps)
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-1">
                     <span className={`font-bold font-mono leading-none ${
-                      String(riskScore).length >= 5
-                        ? 'text-[12px]'
-                        : String(riskScore).length === 4
-                        ? 'text-[14px]'
-                        : 'text-[18px]'
+                      String(riskScore).length >= 6
+                        ? 'text-[11px]'
+                        : String(riskScore).length >= 5
+                        ? 'text-[13px]'
+                        : 'text-[17px]'
                     } ${riskTextClass}`}>
-                      {riskScore}
+                      {typeof riskScore === 'number' ? (Number.isInteger(riskScore) ? String(riskScore) : riskScore.toFixed(1)) : '0'}
                     </span>
                     <span className="text-[9px] uppercase font-semibold text-slate-400 leading-none mt-1 tracking-wider">
                       Score

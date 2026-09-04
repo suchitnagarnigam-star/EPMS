@@ -3,7 +3,7 @@ from typing import Any
 import asyncpg
 import logging
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from database import get_db
 from models import SyncPayload, WorkSyncItem, QualitySyncItem
@@ -365,9 +365,31 @@ async def resolve_officer(conn, row: WorkSyncItem) -> tuple[int | None, list[int
 # ── METRICS ──
 
 def compute_days_overdue(row: WorkSyncItem) -> int | None:
-    if row.delivery_status == "Completed" or not row.scheduled_end_date:
+    if row.delivery_status == "Completed":
         return None
-    delta = (date.today() - row.scheduled_end_date).days
+
+    target_end = row.scheduled_end_date
+
+    # Fallback: if scheduled_end_date is missing, attempt calculation from start_date (or work_order_no_date) + time_limit_months
+    if not target_end and row.time_limit_months and row.time_limit_months > 0:
+        start = row.start_date
+        if not start and row.work_order_no_date:
+            match = re.search(r'\b(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})\b', str(row.work_order_no_date))
+            if match:
+                day, month, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                if year < 100:
+                    year += 2000
+                try:
+                    start = date(year, month, day)
+                except ValueError:
+                    start = None
+        if start:
+            target_end = start + timedelta(days=int(row.time_limit_months * 30.44))
+
+    if not target_end:
+        return None
+
+    delta = (date.today() - target_end).days
     if delta <= 0:
         return 0
     return min(delta, 3650)  # 10-year cap on overdue
