@@ -102,7 +102,7 @@ export default function ContractorMatrix() {
     setExpandedAgency(agencyName);
     if (!agencyWorksMap[agencyName]) {
       setLoadingWorks(prev => ({ ...prev, [agencyName]: true }));
-      fetchWorks({ search: agencyName, page_size: 50 })
+      fetchWorks({ agency_name: agencyName, page_size: 200 })
         .then(res => {
           setAgencyWorksMap(prev => ({ ...prev, [agencyName]: res.results }));
         })

@@ -223,6 +223,7 @@ export interface WorksFilters {
   risk_score_min?: number;
   officer_id?: number;
   agency_id?: number;
+  agency_name?: string;
   search?: string;
   sort_by?: string;
   sort_order?: string;

@@ -27,6 +27,7 @@ async def get_works(
     risk_score_min: Optional[float] = None,
     officer_id: Optional[int] = None,
     agency_id: Optional[int] = None,
+    agency_name: Optional[str] = None,
     search: Optional[str] = None,
     sort_by: Optional[str] = "risk_score",
     sort_order: Optional[str] = "desc",
@@ -72,6 +73,10 @@ async def get_works(
     if agency_id is not None:
         params.append(agency_id)
         conditions.append(f"F.agency_id = ${len(params)}")
+
+    if agency_name and agency_name.strip():
+        params.append(agency_name.strip())
+        conditions.append(f"A.agency_name = ${len(params)}")
 
     if search:
         params.append(f"%{search}%")
