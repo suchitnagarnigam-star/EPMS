@@ -359,11 +359,19 @@ export default function WorkDetailModal({ work, onClose }: WorkDetailModalProps)
                       className="transition-all duration-500 ease-out"
                     />
                   </svg>
-                  <div className="absolute flex flex-col items-center">
-                    <span className={`text-[20px] font-bold font-mono ${riskTextClass}`}>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-1">
+                    <span className={`font-bold font-mono leading-none ${
+                      String(riskScore).length >= 5
+                        ? 'text-[12px]'
+                        : String(riskScore).length === 4
+                        ? 'text-[14px]'
+                        : 'text-[18px]'
+                    } ${riskTextClass}`}>
                       {riskScore}
                     </span>
-                    <span className="text-[9px] uppercase font-semibold text-slate-400">Score</span>
+                    <span className="text-[9px] uppercase font-semibold text-slate-400 leading-none mt-1 tracking-wider">
+                      Score
+                    </span>
                   </div>
                 </div>
               </div>
