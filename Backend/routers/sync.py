@@ -258,37 +258,76 @@ import re
 def parse_officers(raw_string: str | None) -> list[dict[str, str]]:
     if not raw_string or not raw_string.strip():
         return []
-    
-    designations = {"JE", "SDO", "XEN", "EE"}
-    lines = re.split(r'[\r\n,;]+', raw_string)
+
+    raw = raw_string.strip()
+
+    # Pre-process slash designation prefixes/suffixes
+    raw = re.sub(r'\b(JE|SDO|XEN|EE|SE|J\.E|S\.D\.O|X\.E\.N)\b\s*/\s*', r' |\1: ', raw, flags=re.IGNORECASE)
+    raw = re.sub(r'/(?=\w)', ' | ', raw)
+    raw = re.sub(r'\s*[\r\n,;;&]+\s*', ' | ', raw)
+    raw = re.sub(r'\b(?:and|\&)\b', ' | ', raw, flags=re.IGNORECASE)
+    raw = re.sub(r'-\s*(J\.?E\.?|SDO|XEN|EE|SE)\b', r' \1', raw, flags=re.IGNORECASE)
+
+    initial_chunks = [c.strip() for c in raw.split('|') if c.strip()]
     results = []
-    
-    for line in lines:
-        tokens = line.strip().split()
-        if not tokens:
-            continue
-        
-        found_designation = None
-        name_tokens = []
-        
-        for token in tokens:
-            clean_tok = re.sub(r'[^A-Za-z]', '', token).upper()
-            if clean_tok in designations:
-                found_designation = clean_tok
-            else:
-                name_tokens.append(token)
-        
-        name = " ".join(name_tokens).strip()
-        if not name and found_designation:
-            name = found_designation
-            found_designation = "OTHER"
-        elif not name:
-            continue
+
+    designation_map = {
+        'JE': 'JE', 'J.E': 'JE', 'J.E.': 'JE',
+        'SDO': 'SDO', 'S.D.O': 'SDO',
+        'XEN': 'XEN', 'X.E.N': 'XEN',
+        'EE': 'EE', 'E.E': 'EE',
+        'SE': 'SE', 'S.E': 'SE'
+    }
+
+    last_name_pattern = r'(\b(?:Singh|Sharma|Sethi|Pathak|Ram|KamalRam|Garcha|Kumar|Juneja|Sikka|Grewal|Sodhi|Kaur)\b)'
+
+    for chunk in initial_chunks:
+        current_desig = "OTHER"
+        if ':' in chunk and any(k in chunk.split(':')[0].upper() for k in designation_map):
+            parts = chunk.split(':', 1)
+            d_key = parts[0].strip().upper()
+            current_desig = designation_map.get(d_key, 'OTHER')
+            chunk = parts[1].strip()
+
+        sub_chunks = re.split(r'(?=\b(?:Er\.|Sh\.|Smt\.)\b)', chunk)
+        for sc in sub_chunks:
+            sc = sc.strip()
+            if not sc:
+                continue
+
+            desig_match = re.search(r'\b(JE|SDO|XEN|EE|SE|J\.E|S\.D\.O|X\.E\.N)\b|\((SDO|XEN|JE|EE|SE)\)', sc, re.IGNORECASE)
+            sc_desig = current_desig
+            if desig_match:
+                d_str = (desig_match.group(1) or desig_match.group(2)).upper()
+                sc_desig = designation_map.get(d_str, sc_desig)
+                sc = re.sub(r'\b(JE|SDO|XEN|EE|SE|J\.E|S\.D\.O|X\.E\.N)\b|\((SDO|XEN|JE|EE|SE)\)', '', sc, flags=re.IGNORECASE).strip()
+
+            split_names = re.split(last_name_pattern, sc)
             
-        designation = found_designation if found_designation else "OTHER"
-        results.append({"name": name, "designation": designation})
-        
+            recomposed = []
+            temp_name = ""
+            for token in split_names:
+                if not token.strip():
+                    continue
+                temp_name += " " + token.strip()
+                if re.match(last_name_pattern, token.strip()):
+                    recomposed.append(temp_name.strip())
+                    temp_name = ""
+            if temp_name.strip():
+                recomposed.append(temp_name.strip())
+
+            for name in recomposed:
+                cleaned_name = re.sub(r'^[^\w\s\.]+|[^\w\s\.]+$', '', name).strip()
+                cleaned_name = re.sub(r'\s+', ' ', cleaned_name)
+                cleaned_name = cleaned_name.replace("KamalRam", "Kamal Ram").replace("JAgroop", "Jagroop").replace("Manpreeet", "Manpreet")
+                
+                if not cleaned_name or len(cleaned_name) < 2 or cleaned_name.upper() in ('JE', 'SDO', 'XEN', 'EE', 'OTHER'):
+                    continue
+
+                results.append({"name": cleaned_name, "designation": sc_desig})
+
     return results
+
 
 
 async def resolve_officer(conn, row: WorkSyncItem) -> tuple[int | None, list[int]]:
