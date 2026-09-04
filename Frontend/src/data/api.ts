@@ -193,6 +193,12 @@ async function apiFetch<T>(path: string, params?: Record<string, string | number
 
   const res = await fetch(url.toString(), { headers });
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('mcl_auth_token');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
     const text = await res.text().catch(() => '');
     throw new Error(`API ${res.status}: ${text || res.statusText}`);
   }
@@ -309,6 +315,10 @@ export async function createUser(data: { name: string; email: string; role: stri
     body: JSON.stringify(data),
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('mcl_auth_token');
+      if (window.location.pathname !== '/login') window.location.href = '/login';
+    }
     const err = await res.json().catch(() => ({ detail: 'Failed to create user' }));
     throw new Error(err.detail || 'Failed to create user');
   }
@@ -326,6 +336,10 @@ export async function updateUser(id: number, data: { role?: string; is_active?: 
     body: JSON.stringify(data),
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('mcl_auth_token');
+      if (window.location.pathname !== '/login') window.location.href = '/login';
+    }
     const err = await res.json().catch(() => ({ detail: 'Failed to update user' }));
     throw new Error(err.detail || 'Failed to update user');
   }
@@ -342,6 +356,10 @@ export async function deleteUser(id: number): Promise<{ status: string; id: numb
     headers,
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('mcl_auth_token');
+      if (window.location.pathname !== '/login') window.location.href = '/login';
+    }
     const err = await res.json().catch(() => ({ detail: 'Failed to delete user' }));
     throw new Error(err.detail || 'Failed to delete user');
   }

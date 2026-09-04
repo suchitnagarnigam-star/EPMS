@@ -48,7 +48,8 @@ function isTokenValid(token: string): { valid: boolean; user: User | null } {
   const payload = parseJwt(token);
   if (!payload || !payload.exp) return { valid: false, user: null };
 
-  const isExpired = payload.exp * 1000 <= Date.now();
+  // Buffer of 5 seconds to prevent edge-case race conditions
+  const isExpired = payload.exp * 1000 <= Date.now() + 5000;
   if (isExpired) return { valid: false, user: null };
 
   const email = payload.sub || payload.email || 'user';
@@ -57,11 +58,19 @@ function isTokenValid(token: string): { valid: boolean; user: User | null } {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(() => {
+    const saved = localStorage.getItem(TOKEN_KEY);
+    if (!saved) return null;
+    const { valid } = isTokenValid(saved);
+    if (valid) return saved;
+    localStorage.removeItem(TOKEN_KEY);
+    return null;
+  });
+
   const [user, setUser] = useState<User | null>(() => {
-    const initialToken = localStorage.getItem(TOKEN_KEY);
-    if (!initialToken) return null;
-    const { valid, user: parsedUser } = isTokenValid(initialToken);
+    const saved = localStorage.getItem(TOKEN_KEY);
+    if (!saved) return null;
+    const { valid, user: parsedUser } = isTokenValid(saved);
     if (valid) return parsedUser;
     localStorage.removeItem(TOKEN_KEY);
     return null;
@@ -80,6 +89,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setUser(null);
     }
+  }, [token]);
+
+  // Periodic and focus check for token expiration
+  useEffect(() => {
+    if (!token) return;
+
+    const checkExpiration = () => {
+      const { valid } = isTokenValid(token);
+      if (!valid) {
+        localStorage.removeItem(TOKEN_KEY);
+        setToken(null);
+        setUser(null);
+      }
+    };
+
+    const interval = setInterval(checkExpiration, 10000);
+    window.addEventListener('focus', checkExpiration);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', checkExpiration);
+    };
   }, [token]);
 
   async function login(email: string, pass: string) {
