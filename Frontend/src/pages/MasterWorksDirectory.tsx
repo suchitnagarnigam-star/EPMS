@@ -4,12 +4,14 @@ import StageBadge from '../components/StageBadge';
 import RiskBadge from '../components/RiskBadge';
 import ProgressBar from '../components/ProgressBar';
 import MethodologyTooltip from '../components/MethodologyTooltip';
+import WorkDetailModal from '../components/WorkDetailModal';
 import { useApi } from '../data/useApi';
-import { fetchWorks } from '../data/api';
+import { fetchWorks, type WorkRecord } from '../data/api';
 
 const PAGE_SIZE = 25;
 
 export default function MasterWorksDirectory() {
+  const [selectedWork, setSelectedWork] = useState<WorkRecord | null>(null);
   const [search,    setSearch]    = useState('');
   const [branch,    setBranch]    = useState('All');
   const [zone,      setZone]      = useState('All');
@@ -203,7 +205,11 @@ export default function MasterWorksDirectory() {
               </thead>
               <tbody className="tbl-body">
                 {results.map(w => (
-                  <tr key={w.work_id}>
+                  <tr
+                    key={w.work_id}
+                    onClick={() => setSelectedWork(w)}
+                    className="cursor-pointer transition-colors hover:bg-slate-500/10"
+                  >
                     <td><span className="font-semibold" style={{ color: 'var(--text-1)' }}>{w.work_id}</span></td>
                     <td>{w.branch}</td>
                     <td>{w.zone || '—'}</td>
@@ -279,6 +285,9 @@ export default function MasterWorksDirectory() {
           </div>
         </div>
       </div>
+
+      {/* Work Detail Modal */}
+      <WorkDetailModal work={selectedWork} onClose={() => setSelectedWork(null)} />
 
     </div>
   );

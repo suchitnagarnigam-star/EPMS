@@ -101,6 +101,7 @@ Main Tracker (B&R / O&M tabs)
 - **Admin Email Management UI**: Built `dashboard_users` Neon DB table, `/admin/users` CRUD REST endpoints in FastAPI, and `ProfilePage.tsx` interface for admin email access management.
 - **Date Ingestion Sanitization**: Patched `parse_date_safe` in `models.py` with string regex extraction and a **Year ≥ 2000 guard** to reject Excel serial number errors (e.g. `10/01/1900`), fixing artificial risk score spikes (MCL-0357).
 - **Warm Beige Theme Engine**: Redesigned Light Theme (`[data-theme="light"]`) with a warm beige stone color palette (`#f5f2eb`), rich stone typography (`#1c1917`), warm indigo accents (`#3551e0`), and warm amber/emerald/crimson status badges.
+- **WorkDetailModal (`WorkDetailModal.tsx`)**: Built a slide-up/fade-in frosted glass modal featuring 7 detailed sections (Header & Description, Identity, Location, Agency, Financial Stat Grid, Status & Physical Progress, SVG Risk Score Ring with driving factors, Data Quality Flag pills). Integrated with `MasterWorksDirectory.tsx` row click handler with keyboard `Escape` shortcut and body scroll locking.
 
 ---
 
