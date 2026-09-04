@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import { fetchWorks, type WorkRecord } from '../data/api';
+import { fetchWorkById, type WorkRecord } from '../data/api';
 import WorkDetailModal from '../components/WorkDetailModal';
 
 interface WorkModalContextType {
@@ -23,11 +23,8 @@ export const WorkModalProvider = ({ children }: { children: ReactNode }) => {
       setSelectedWork(initialWork);
     } else {
       setSelectedWork(null);
-      fetchWorks({ search: workId, page_size: 1 })
-        .then(res => {
-          const match = res.results.find(w => w.work_id === workId) || res.results[0];
-          if (match) setSelectedWork(match);
-        })
+      fetchWorkById(workId)
+        .then(rec => setSelectedWork(rec))
         .catch(err => console.error("Failed to load work details:", err));
     }
   };

@@ -154,3 +154,44 @@ async def get_works(
         "results": results
     }
 
+
+@router.get("/{work_id:path}")
+async def get_work_by_id(work_id: str, conn: Connection = Depends(get_db)):
+    query = """
+        SELECT 
+            F.work_id, F.sr_no, F.branch, F.location_id, F.agency_id, F.fund_id, F.work_type_id, F.officer_id,
+            F.work_description, F.length_rmt, F.road_width_ft, F.est_cost_lacs, F.tender_cost_lacs, F.expenditure_lacs,
+            F.workflow_stage, F.delivery_status, F.aa_approved, F.ts_approved, F.ts_accorded_by,
+            F.resolution_no_date, F.work_order_no_date, F.tender_float_date, F.tender_end_date, F.tech_eval_done, F.fin_eval_done,
+            F.start_date, F.time_limit_months, F.scheduled_end_date, F.actual_completion_date,
+            CASE 
+              WHEN F.delivery_status ILIKE '%complet%' AND COALESCE(F.physical_progress_pct, 0) = 0
+              THEN 100.0
+              ELSE F.physical_progress_pct 
+            END AS physical_progress_pct,
+            CASE 
+              WHEN F.delivery_status ILIKE '%complet%' AND COALESCE(F.physical_progress_pct, 0) = 0
+              THEN true ELSE false 
+            END AS progress_inferred,
+            F.financial_progress_pct, F.fin_progress_anomaly,
+            F.days_overdue, F.risk_score, F.issues_bottlenecks, F.remarks,
+            F.source_sheet, F.source_row, F.record_hash, F.data_quality_flags, F.pipeline_version, F.staged_at,
+            L.zone, L.sub_zone, INITCAP(TRIM(L.constituency)) AS constituency, L.ward,
+            A.agency_name,
+            W.nature_of_work,
+            O.officer_name,
+            FD.fund_type, FD.quota_label
+        FROM fact_works F
+        LEFT JOIN dim_location L ON F.location_id = L.location_id
+        LEFT JOIN dim_agency A ON F.agency_id = A.agency_id
+        LEFT JOIN dim_work_type W ON F.work_type_id = W.work_type_id
+        LEFT JOIN dim_officer O ON F.officer_id = O.officer_id
+        LEFT JOIN dim_fund FD ON F.fund_id = FD.fund_id
+        WHERE F.work_id = $1
+    """
+    row = await conn.fetchrow(query, work_id)
+    if not row:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Work record not found")
+    return record_to_dict(row)
+

@@ -234,6 +234,10 @@ export function fetchWorks(filters: WorksFilters = {}): Promise<WorksResponse> {
   return apiFetch<WorksResponse>('/works', filters as Record<string, string | number | undefined>);
 }
 
+export function fetchWorkById(workId: string): Promise<WorkRecord> {
+  return apiFetch<WorkRecord>(`/works/${encodeURIComponent(workId)}`);
+}
+
 export function fetchOfficers(designation?: string, branch?: string): Promise<OfficerRecord[]> {
   return apiFetch<OfficerRecord[]>('/kpis/officers', { designation, branch });
 }
