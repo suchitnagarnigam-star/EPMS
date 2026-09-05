@@ -366,3 +366,47 @@ export async function deleteUser(id: number): Promise<{ status: string; id: numb
   return res.json();
 }
 
+// ─── SASCI-MDF Flagship Data Types & Endpoint ─────────────────
+
+export interface SasciWork {
+  id: number;
+  sr_no: number;
+  name_of_road: string | null;
+  type_of_road: string | null;
+  source_of_funding: string | null;
+  constituency: string | null;
+  est_cost_crores: number | null;
+  est_cost_lacs: number | null;
+  total_length_km: number | null;
+  completed_length_km: number | null;
+  pct_length_completed: number | null;
+  white_line_target_km: number | null;
+  white_line_done_km: number | null;
+  progress_as_of: string | null;
+  target_completion_date: string | null;
+  remarks: string | null;
+  record_hash: string | null;
+  pipeline_version: string | null;
+  last_updated: string | null;
+  created_at: string | null;
+}
+
+export interface SasciKpis {
+  total_works: number;
+  total_km: number;
+  completed_km: number;
+  avg_pct_complete: number;
+  mdf_count: number;
+  sasci_count: number;
+}
+
+export interface SasciDataResponse {
+  works: SasciWork[];
+  kpis: SasciKpis;
+}
+
+export function fetchSasciData(): Promise<SasciDataResponse> {
+  return apiFetch<SasciDataResponse>('/sasci');
+}
+
+

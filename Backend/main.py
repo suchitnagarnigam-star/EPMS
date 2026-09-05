@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 import asyncpg
 
 from database import DATABASE_URL, get_pool_params
-from routers import auth, sync, kpis, works, contractor, data_quality, admin
+from routers import auth, sync, kpis, works, contractor, data_quality, admin, sasci
 from routers.auth import get_current_user
 
 # Configure logging
@@ -75,6 +75,7 @@ async def verify_sync_api_key(request: Request, call_next):
 # Register public & machine-to-machine routers
 app.include_router(auth.router)
 app.include_router(sync.router)
+app.include_router(sasci.router)
 
 # Register protected dashboard routers (Part B — Dashboard JWT Authentication)
 app.include_router(kpis.router, dependencies=[Depends(get_current_user)])

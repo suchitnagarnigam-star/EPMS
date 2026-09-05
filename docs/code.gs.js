@@ -90,6 +90,7 @@ function scheduledSync() {
   });
 
   pushToFastAPI();
+  syncSasciMdf(mainSS);
 }
 
 function testSync() {
@@ -483,3 +484,198 @@ function clearStaging() {
     }
   });
 }
+
+// ============================================================
+// SASCI-MDF INGESTION PIPELINE (PHASE 5)
+// ============================================================
+
+/**
+ * Dynamic header-based parser for SASCI-MDF road works
+ */
+function parseSasciRow(headers, rowData) {
+  const findHeaderIdx = (patterns) => {
+    for (let i = 0; i < headers.length; i++) {
+      const h = String(headers[i] || "").trim().toLowerCase();
+      if (patterns.some(p => p instanceof RegExp ? p.test(h) : h.includes(p.toLowerCase()))) {
+        return i;
+      }
+    }
+    return -1;
+  };
+
+  const srNoIdx          = findHeaderIdx(["sr_no", "sr.no", "sr no", "s.no", "sr. no"]);
+  const roadNameIdx      = findHeaderIdx(["name_of_road", "name of road", "road_name", "road name", "work_description", "work description"]);
+  const roadTypeIdx      = findHeaderIdx(["type_of_road", "type of road", "road_type", "road type", "nature_of_work"]);
+  const fundingIdx       = findHeaderIdx(["source_of_funding", "source of funding", "fund_type", "funding_source", "funding"]);
+  const constituencyIdx  = findHeaderIdx(["constituency"]);
+  const estCostIdx       = findHeaderIdx(["est_cost_crores", "est. cost (crores)", "est cost (crore)", "estimated cost", "est_cost"]);
+  const totalLengthIdx   = findHeaderIdx(["total_length_km", "total length (km)", "total length in km", "total length", "length_km", "length (km)"]);
+  const targetKmIdx      = findHeaderIdx(["white_line_target_km", "white line target", "target (km)", "target length"]);
+  const doneKmIdx        = findHeaderIdx(["white_line_done_km", "white line done", "white line completed", "done (km)"]);
+  const remarksIdx       = findHeaderIdx(["remarks", "remark", "status", "notes"]);
+
+  // Scan snapshot progress headers matching pattern "% length completed" or "Total length completed"
+  let snapshotIdx = -1;
+  let snapshotHeaderName = "";
+  for (let i = headers.length - 1; i >= 0; i--) {
+    const h = String(headers[i] || "").trim();
+    if (/%\s*length\s*completed|total\s*length\s*completed|%\s*completed|length\s*completed/i.test(h)) {
+      const val = rowData[i];
+      if (val !== "" && val !== null && val !== undefined && String(val).trim() !== "") {
+        snapshotIdx = i;
+        snapshotHeaderName = h;
+        break;
+      }
+    }
+  }
+
+  const parseNum = (val) => {
+    if (val === "" || val === null || val === undefined) return null;
+    const num = parseFloat(String(val).replace(/[^0-9.-]/g, ""));
+    return isNaN(num) ? null : num;
+  };
+
+  const sr_no = srNoIdx >= 0 ? parseInt(rowData[srNoIdx], 10) : null;
+  const name_of_road = roadNameIdx >= 0 ? String(rowData[roadNameIdx] || "").trim() : "";
+  const type_of_road = roadTypeIdx >= 0 ? String(rowData[roadTypeIdx] || "").trim() : "";
+  const source_of_funding = fundingIdx >= 0 ? String(rowData[fundingIdx] || "").trim() : "";
+  const constituency = constituencyIdx >= 0 ? String(rowData[constituencyIdx] || "").trim() : "";
+  const est_cost_crores = estCostIdx >= 0 ? parseNum(rowData[estCostIdx]) : null;
+  const est_cost_lacs = est_cost_crores !== null ? Math.round(est_cost_crores * 100 * 100) / 100 : null;
+  const total_length_km = totalLengthIdx >= 0 ? parseNum(rowData[totalLengthIdx]) : null;
+  const white_line_target_km = targetKmIdx >= 0 ? parseNum(rowData[targetKmIdx]) : null;
+  const white_line_done_km = doneKmIdx >= 0 ? parseNum(rowData[doneKmIdx]) : null;
+  const remarks = remarksIdx >= 0 ? String(rowData[remarksIdx] || "").trim() : "";
+
+  // Progress as of & physical % extraction
+  let pct_length_completed = null;
+  let completed_length_km = null;
+  let progress_as_of = null;
+
+  if (snapshotIdx >= 0) {
+    const rawVal = rowData[snapshotIdx];
+    pct_length_completed = parseNum(rawVal);
+
+    // Extract date label from snapshot header (e.g. "Total length completed as on 15.01.2025")
+    const dateMatch = snapshotHeaderName.match(/(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/);
+    if (dateMatch) {
+      progress_as_of = dateMatch[1];
+    } else {
+      progress_as_of = snapshotHeaderName;
+    }
+  }
+
+  if (pct_length_completed !== null && total_length_km !== null) {
+    completed_length_km = Math.round((total_length_km * (pct_length_completed / 100)) * 100) / 100;
+  } else if (white_line_done_km !== null) {
+    completed_length_km = white_line_done_km;
+    if (total_length_km !== null && total_length_km > 0) {
+      pct_length_completed = Math.round((completed_length_km / total_length_km * 100) * 100) / 100;
+    }
+  }
+
+  // Parse target_completion_date from remarks freetext via regex
+  let target_completion_date = null;
+  if (remarks) {
+    const dMatch = remarks.match(/\b(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})\b|\b(\d{4})[./-](\d{1,2})[./-](\d{1,2})\b/);
+    if (dMatch) {
+      if (dMatch[1]) {
+        let day = parseInt(dMatch[1], 10);
+        let month = parseInt(dMatch[2], 10);
+        let year = parseInt(dMatch[3], 10);
+        if (year < 100) year += 2000;
+        target_completion_date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      } else if (dMatch[4]) {
+        target_completion_date = `${dMatch[4]}-${String(dMatch[5]).padStart(2, '0')}-${String(dMatch[6]).padStart(2, '0')}`;
+      }
+    }
+  }
+
+  // Record Hash: MD5 over sr_no + name_of_road + pct_length_completed + completed_length_km
+  const hashInput = [sr_no, name_of_road, pct_length_completed, completed_length_km].join("|");
+  const record_hash = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.MD5, hashInput
+  ).map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+
+  return {
+    sr_no,
+    name_of_road,
+    type_of_road,
+    source_of_funding,
+    constituency,
+    est_cost_crores,
+    est_cost_lacs,
+    total_length_km,
+    completed_length_km,
+    pct_length_completed,
+    white_line_target_km,
+    white_line_done_km,
+    progress_as_of,
+    target_completion_date,
+    remarks,
+    record_hash,
+    pipeline_version: "v1.0"
+  };
+}
+
+/**
+ * Syncs SASCI-MDF tab data to FastAPI /sync/sasci endpoint
+ */
+function syncSasciMdf(mainSS) {
+  const sheetNames = ["SASCI-MDF", "SASCI_MDF", "SASCI MDF", "Flagship Works"];
+  let sasciSheet = null;
+  for (const name of sheetNames) {
+    sasciSheet = mainSS.getSheetByName(name);
+    if (sasciSheet) break;
+  }
+
+  if (!sasciSheet) {
+    Logger.log("SASCI-MDF tab not found in main spreadsheet.");
+    return;
+  }
+
+  const lastRow = sasciSheet.getLastRow();
+  const lastCol = sasciSheet.getLastColumn();
+  if (lastRow < 2) return;
+
+  const headers = sasciSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const allData = sasciSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  const parsedRows = [];
+
+  allData.forEach((rowData, i) => {
+    if (rowData.every(c => c === "" || c === null || c === undefined)) return;
+    try {
+      const parsed = parseSasciRow(headers, rowData);
+      if (parsed.sr_no || parsed.name_of_road) {
+        parsedRows.push(parsed);
+      }
+    } catch (err) {
+      Logger.log("Error parsing SASCI row " + (i + 2) + ": " + err.message);
+    }
+  });
+
+  if (parsedRows.length === 0) {
+    Logger.log("No valid SASCI-MDF rows found to sync.");
+    return;
+  }
+
+  const url = FASTAPI_URL + "/sync/sasci";
+  const apiKey = "5853ea63d5d24171bb0d88f5bb098fbcdcc48ec1a00131c1b7f93b9d7d30bc67";
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      "X-API-Key": apiKey
+    },
+    payload: JSON.stringify(parsedRows),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    Logger.log("SASCI-MDF Sync Response: " + response.getContentText());
+  } catch (err) {
+    Logger.log("SASCI-MDF Sync Error: " + err.message);
+  }
+}
+

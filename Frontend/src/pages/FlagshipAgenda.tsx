@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Download, Info } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   type BarShapeProps,
 } from 'recharts';
-import { flagshipMDF, flagshipSASCI } from '../data/mockData';
+import { fetchSasciData, type SasciWork } from '../data/api';
+import { useApi } from '../data/useApi';
 import ProgressBar from '../components/ProgressBar';
-import type { FlagshipWork } from '../data/types';
+import SasciDetailModal from '../components/SasciDetailModal';
+import LoadingSkeleton, { KpiCardSkeleton, ChartSkeleton } from '../components/LoadingSkeleton';
+import { ErrorState } from '../components/ErrorState';
 
-// Factory that returns a brightened active-bar render function accepted by Recharts
 function makeBrightBar(overrideFill?: string) {
   return function ActiveBar(props: BarShapeProps) {
     const { x = 0, y = 0, width = 0, height = 0, fill = '#4f6ef7' } = props;
@@ -32,165 +34,204 @@ const TOOLTIP_STYLE = {
   boxShadow: 'var(--glass-shadow)',
 };
 
-function stageBadgeFor(w: FlagshipWork) {
-  if (w.physicalProgress === 100) return <span className="badge badge-success">Completed</span>;
-  if (w.physicalProgress === 0)   return <span className="badge badge-neutral">Not Started</span>;
-  if (w.physicalProgress < 30)    return <span className="badge badge-danger">Early Stage</span>;
-  if (w.physicalProgress < 60)    return <span className="badge badge-warn">In Progress</span>;
-  return <span className="badge badge-info">Advanced</span>;
-}
-
-function WorkTable({ works, title, color }: { works: FlagshipWork[]; title: string; color: string }) {
-  return (
-    <div className="card overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3.5"
-           style={{ borderBottom: '1px solid #1f1f1f', background: '#111111' }}>
-        <div className="flex items-center gap-3">
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-          <h3 className="text-[13px] font-semibold" style={{ color: '#d0d0d0' }}>{title}</h3>
-          <span className="badge badge-neutral">{works.length} Works</span>
-        </div>
-        <button className="btn-ghost py-1 text-[11px]"><Download size={12} /> Export</button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full" style={{ minWidth: 1060 }}>
-          <thead className="tbl-head">
-            <tr>
-              <th>Work ID</th>
-              <th style={{ minWidth: 280 }}>Name of Work</th>
-              <th>Road Type</th>
-              <th className="text-right">Total Km</th>
-              <th className="text-right">Done Km</th>
-              <th className="text-right">Estimate (Lacs)</th>
-              <th className="text-right">Tender (Lacs)</th>
-              <th className="text-right">Bills Paid</th>
-              <th style={{ minWidth: 140 }}>Physical %</th>
-              <th style={{ minWidth: 140 }}>Financial %</th>
-              <th>Status</th>
-              <th style={{ minWidth: 180 }}>Supervisor Notes</th>
-            </tr>
-          </thead>
-          <tbody className="tbl-body">
-            {works.map(w => (
-              <tr key={w.id}>
-                <td><span className="font-semibold" style={{ color: '#a0a0a0' }}>{w.id}</span></td>
-                <td style={{ color: '#c0c0c0', maxWidth: 300 }}>
-                  <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {w.name}
-                  </div>
-                </td>
-                <td><span className="badge badge-neutral">{w.roadType}</span></td>
-                <td className="text-right font-medium" style={{ color: '#d0d0d0' }}>{w.totalKm}</td>
-                <td className="text-right" style={{ color: '#3db97d' }}>{w.completedKm}</td>
-                <td className="text-right font-medium" style={{ color: '#d0d0d0' }}>₹{w.estimateCost.toLocaleString()}</td>
-                <td className="text-right">₹{w.tenderCost.toLocaleString()}</td>
-                <td className="text-right" style={{ color: '#3db97d' }}>₹{w.billsPaid.toLocaleString()}</td>
-                <td><ProgressBar value={w.physicalProgress} showLabel /></td>
-                <td><ProgressBar value={w.financialProgress} color="#3d9bd4" showLabel /></td>
-                <td>{stageBadgeFor(w)}</td>
-                <td className="text-[11px]" style={{ color: '#707070', maxWidth: 200 }}>
-                  <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {w.supervisorNotes}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+function stageBadgeFor(pct: number | null) {
+  const p = pct ?? 0;
+  if (p === 100) return <span className="badge badge-success">Completed</span>;
+  if (p > 75)    return <span className="badge badge-info">Advanced</span>;
+  if (p >= 25)   return <span className="badge badge-warn">In Progress</span>;
+  return <span className="badge badge-danger">Early Stage</span>;
 }
 
 export default function FlagshipAgenda() {
-  const [activeTab, setActiveTab] = useState<'MDF' | 'SASCI'>('MDF');
+  const { data, loading, error, refetch } = useApi(fetchSasciData);
+  const [sourceFilter, setSourceFilter] = useState<'ALL' | 'MDF' | 'SASCI'>('ALL');
+  const [selectedWork, setSelectedWork] = useState<SasciWork | null>(null);
 
-  const allWorks = [...flagshipMDF, ...flagshipSASCI];
+  if (loading) {
+    return (
+      <div className="p-6 max-w-[1440px] mx-auto space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KpiCardSkeleton />
+          <KpiCardSkeleton />
+          <KpiCardSkeleton />
+          <KpiCardSkeleton />
+        </div>
+        <ChartSkeleton height="h-48" />
+        <LoadingSkeleton height={300} label="Loading flagship road works..." />
+      </div>
+    );
+  }
 
-  const kpis = {
-    total:      allWorks.length,
-    mdf:        flagshipMDF.length,
-    sasci:      flagshipSASCI.length,
-    sanctioned: allWorks.reduce((a, w) => a + w.estimateCost, 0),
-    tender:     allWorks.reduce((a, w) => a + w.tenderCost,   0),
-    totalKm:    allWorks.reduce((a, w) => a + w.totalKm,      0),
-    doneKm:     allWorks.reduce((a, w) => a + w.completedKm,  0),
-    paid:       allWorks.reduce((a, w) => a + w.billsPaid,     0),
+  if (error) {
+    return (
+      <div className="p-6 max-w-[1440px] mx-auto">
+        <ErrorState message={error} onRetry={refetch} />
+      </div>
+    );
+  }
+
+  const allWorks = data?.works || [];
+  const kpis = data?.kpis || {
+    total_works: 0,
+    total_km: 0,
+    completed_km: 0,
+    avg_pct_complete: 0,
+    mdf_count: 0,
+    sasci_count: 0,
   };
 
-  const chartData = allWorks.map(w => ({
-    name:     w.id,
-    physical: w.physicalProgress,
-    financial:w.financialProgress,
-    fill:     w.fundSource === 'MDF' ? '#4f6ef7' : '#3d9bd4',
-  }));
+  const filteredWorks = allWorks.filter(w => {
+    if (sourceFilter === 'ALL') return true;
+    const funding = (w.source_of_funding || '').toUpperCase();
+    return funding.includes(sourceFilter);
+  });
+
+  const chartData = filteredWorks.map(w => {
+    const funding = (w.source_of_funding || '').toUpperCase();
+    const prefix = funding.includes('MDF') ? 'MDF' : 'SCI';
+    const workId = `${prefix}-${String(w.sr_no || w.id).padStart(3, '0')}`;
+    return {
+      name: workId,
+      physical: w.pct_length_completed ?? 0,
+      fill: funding.includes('MDF') ? '#4f6ef7' : '#3d9bd4',
+    };
+  });
 
   return (
     <div className="p-6 space-y-6 max-w-[1440px] mx-auto">
-
-      {/* Reference data banner */}
-      <div className="card p-3.5 flex items-center gap-3" style={{ borderColor: '#3d9bd4', background: '#0d1b2a' }}>
-        <Info size={16} color="#3d9bd4" />
-        <span className="text-[12px]" style={{ color: '#8bb8d4' }}>
-          Flagship data from last manual import — live sync pipeline coming in Phase 5
-        </span>
-      </div>
-
       {/* KPI Row */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {[
-          { label: 'Flagship Works (MDF + SASCI)',  value: `${kpis.total} Major Works`,      sub: `${kpis.mdf} MDF • ${kpis.sasci} SASCI Flagship`,                          accent: '#4f6ef7' },
-          { label: 'Sanctioned Est. Cost',          value: `₹${(kpis.sanctioned/100).toFixed(2)} Cr`, sub: `MDF: ₹${(flagshipMDF.reduce((a,w)=>a+w.estimateCost,0)/100).toFixed(2)} Cr`,  accent: '#3d9bd4' },
-          { label: 'Allotted Tender Value',         value: `₹${(kpis.tender/100).toFixed(2)} Cr`,    sub: 'Vetted Contract Outlay',                                              accent: '#4f6ef7' },
-          { label: 'Road Infrastructure Length',    value: `${kpis.totalKm.toFixed(2)} Km`,  sub: `${kpis.doneKm.toFixed(2)} Km Completed (${((kpis.doneKm/kpis.totalKm)*100).toFixed(1)}%)`, accent: '#3db97d' },
-          { label: 'Disbursed & Prepared Bills',    value: `₹${(kpis.paid/100).toFixed(2)} Cr`,      sub: `MDF: ₹${(flagshipMDF.reduce((a,w)=>a+w.billsPaid,0)/100).toFixed(2)} Cr`,          accent: '#d4a017' },
-        ].map(k => (
-          <div key={k.label} className="card p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#505050' }}>{k.label}</p>
-            <p className="text-[20px] font-bold mt-1.5 leading-none" style={{ color: k.accent }}>{k.value}</p>
-            <p className="text-[10px] mt-1" style={{ color: '#404040' }}>{k.sub}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="card p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Flagship Works</p>
+          <p className="text-[24px] font-bold mt-1.5 leading-none text-primary-400">{kpis.total_works} Works</p>
+          <p className="text-[10px] mt-1 text-slate-400">{kpis.mdf_count} MDF • {kpis.sasci_count} SASCI</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Road Length</p>
+          <p className="text-[24px] font-bold mt-1.5 leading-none text-sky-400">{kpis.total_km} Km</p>
+          <p className="text-[10px] mt-1 text-slate-400">Target Infrastructure Scope</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Completed Length</p>
+          <p className="text-[24px] font-bold mt-1.5 leading-none text-emerald-400">{kpis.completed_km} Km</p>
+          <p className="text-[10px] mt-1 text-slate-400">
+            {kpis.total_km > 0 ? ((kpis.completed_km / kpis.total_km) * 100).toFixed(1) : 0}% Total Completion
+          </p>
+        </div>
+        <div className="card p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Average Physical %</p>
+          <p className="text-[24px] font-bold mt-1.5 leading-none text-amber-400">{kpis.avg_pct_complete}%</p>
+          <p className="text-[10px] mt-1 text-slate-400">Cross-Project Progress Mean</p>
+        </div>
       </div>
 
       {/* Progress Chart */}
       <div className="card p-5">
-        <h3 className="text-[13px] font-semibold mb-1" style={{ color: '#d0d0d0' }}>Physical vs Financial Progress — All Flagship Works</h3>
-        <p className="text-[11px] mb-4" style={{ color: '#505050' }}>Blue = Physical %, Teal = Financial %</p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-[13px] font-semibold text-slate-200">Physical Progress — All Flagship Works</h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Physical completion percentage by flagship road project</p>
+          </div>
+          <button onClick={refetch} className="btn-ghost p-1.5 text-slate-400 hover:text-slate-200">
+            <RefreshCw size={14} />
+          </button>
+        </div>
         <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={chartData} barGap={1} barSize={9}>
-            <XAxis dataKey="name" tick={{ fill: '#404040', fontSize: 9 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#505050', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
+          <BarChart data={chartData} barGap={1} barSize={12}>
+            <XAxis dataKey="name" tick={{ fill: '#808080', fontSize: 9 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#808080', fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
             <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: 'var(--text-1)' }} labelStyle={{ color: 'var(--text-1)', fontWeight: 600 }} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
-            <Bar dataKey="physical" name="Physical %" radius={[2,2,0,0]} activeBar={makeBrightBar()}>
+            <Bar dataKey="physical" name="Physical Progress %" radius={[2,2,0,0]} activeBar={makeBrightBar()}>
               {chartData.map((d, i) => <Cell key={i} fill={d.fill} stroke="none" />)}
             </Bar>
-            <Bar dataKey="financial" name="Financial %" fill="#3d9bd4" radius={[2,2,0,0]}
-                 activeBar={makeBrightBar('#60b8e8')} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Tab switcher */}
-      <div className="flex gap-2">
-        {(['MDF','SASCI'] as const).map(t => (
-          <button key={t} onClick={() => setActiveTab(t)}
-                  className="px-5 py-2 rounded-lg text-[12px] font-semibold transition-colors"
-                  style={{
-                    background: activeTab === t ? '#4f6ef7' : '#1a1a1a',
-                    color:      activeTab === t ? '#fff'    : '#606060',
-                    border:     `1px solid ${activeTab === t ? '#4f6ef7' : '#2a2a2a'}`,
-                  }}>
-            {t} Works ({t === 'MDF' ? flagshipMDF.length : flagshipSASCI.length})
-          </button>
-        ))}
+      {/* Source Filter Buttons */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          {(['ALL', 'MDF', 'SASCI'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setSourceFilter(f)}
+              className="px-4 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+              style={{
+                background: sourceFilter === f ? '#4f6ef7' : 'var(--card)',
+                color:      sourceFilter === f ? '#fff'    : 'var(--text-2)',
+                border:     `1px solid ${sourceFilter === f ? '#4f6ef7' : 'var(--border)'}`,
+              }}
+            >
+              {f === 'ALL' ? `All Works (${allWorks.length})` : f === 'MDF' ? `MDF Works (${kpis.mdf_count})` : `SASCI Works (${kpis.sasci_count})`}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {activeTab === 'MDF'
-        ? <WorkTable works={flagshipMDF}   title="MDF Flagship Works"   color="#4f6ef7" />
-        : <WorkTable works={flagshipSASCI} title="SASCI Flagship Works" color="#3d9bd4" />
-      }
+      {/* Flagship Works Table */}
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full" style={{ minWidth: 1060 }}>
+            <thead className="tbl-head">
+              <tr>
+                <th>Work ID</th>
+                <th style={{ minWidth: 260 }}>Name of Road</th>
+                <th>Road Type</th>
+                <th>Constituency</th>
+                <th className="text-right">Total KM</th>
+                <th className="text-right">Done KM</th>
+                <th style={{ minWidth: 140 }}>Physical %</th>
+                <th>Progress As Of</th>
+                <th className="text-right">Est. Cost (Lacs)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody className="tbl-body">
+              {filteredWorks.map(w => {
+                const funding = (w.source_of_funding || '').toUpperCase();
+                const prefix = funding.includes('MDF') ? 'MDF' : 'SCI';
+                const workId = `${prefix}-${String(w.sr_no || w.id).padStart(3, '0')}`;
+                return (
+                  <tr
+                    key={w.id}
+                    onClick={() => setSelectedWork(w)}
+                    className="cursor-pointer hover:bg-slate-800/40 transition-colors"
+                  >
+                    <td>
+                      <span className="font-semibold text-slate-300">{workId}</span>
+                    </td>
+                    <td style={{ color: 'var(--text-1)', maxWidth: 300 }}>
+                      <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {w.name_of_road || 'N/A'}
+                      </div>
+                    </td>
+                    <td><span className="badge badge-neutral">{w.type_of_road || 'N/A'}</span></td>
+                    <td className="text-slate-300">{w.constituency || 'Ludhiana'}</td>
+                    <td className="text-right font-medium text-slate-200">{w.total_length_km ?? 'N/A'}</td>
+                    <td className="text-right text-emerald-400 font-medium">{w.completed_length_km ?? 'N/A'}</td>
+                    <td><ProgressBar value={w.pct_length_completed ?? 0} showLabel /></td>
+                    <td className="text-xs text-slate-400">{w.progress_as_of || 'N/A'}</td>
+                    <td className="text-right font-medium text-slate-200">
+                      {w.est_cost_lacs ? `₹${w.est_cost_lacs.toLocaleString()}` : 'N/A'}
+                    </td>
+                    <td>{stageBadgeFor(w.pct_length_completed)}</td>
+                  </tr>
+                );
+              })}
+              {filteredWorks.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="text-center py-8 text-slate-500">
+                    No flagship works found for this filter.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
+      {/* Detail Modal */}
+      <SasciDetailModal work={selectedWork} onClose={() => setSelectedWork(null)} />
     </div>
   );
 }

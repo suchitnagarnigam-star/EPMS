@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Root package manager for MCL Analytics platform",
   "scripts": {
-    "dev:backend": "cd Backend && .venv\\Scripts\\python.exe -m uvicorn main:app --reload --port 8000",
+    "dev:backend": "node -e \"const { spawn } = require('child_process'); const fs = require('fs'); const py = fs.existsSync('Backend/.linuxenv/bin/python') ? '.linuxenv/bin/python' : fs.existsSync('Backend/.venv/bin/python') ? '.venv/bin/python' : fs.existsSync('Backend/.venv/Scripts/python.exe') ? '.venv\\\\Scripts\\\\python.exe' : 'python3'; spawn(py, ['-m', 'uvicorn', 'main:app', '--reload', '--port', '8000'], { stdio: 'inherit', cwd: 'Backend' });\"",
     "dev:frontend": "cd Frontend && npm run dev",
     "dev:full": "npx concurrently -k -p \"[{name}]\" -n \"Backend,Frontend\" -c \"yellow,blue\" \"npm run dev:backend\" \"npm run dev:frontend\""
   },
