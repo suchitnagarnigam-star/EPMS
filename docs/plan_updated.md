@@ -1,78 +1,20 @@
-# MCL Development Tracker — Updated Data Analysis & Implementation Plan
-> Last updated: August 31, 2026
+# EPMS Analytics Platform — Master Implementation Plan (Updated)
 
-## 1. Project Overview & Scope
-
-The Ludhiana Municipal Corporation MCL Analytics Platform ingests data from primary tracker spreadsheets, cleans and structures them, and runs analytical models to serve a real-time monitoring dashboard.
-
-Sources:
-- **B&R Tab** (Buildings & Roads) — Main works.
-- **O&M Tab** (Operations & Maintenance) — Utilities & general works.
-- **SASCI-MDF Tab** — Flagship road projects (tracked by km-length, separately modeled).
+**Project:** Executive Project Management System (EPMS) Analytics Platform  
+**Target:** Municipal Corporation Ludhiana (MCL)  
+**Date:** September 5, 2026  
+**Status:** Phases 1–4, 6, 7 Complete ✅ | Phase 5 Pending 🔄  
 
 ---
 
-## 2. Ingestion & In-Flight Data Cleaning
+## Executive Phase Matrix
 
-Data cleaning is partitioned between two layers:
-1. **Google Apps Script ETL (RAW → CLEAN)**:
-   - Generates Synthetic IDs (`OM-ROW-X`) for works missing Project IDs so they can be tracked without data loss.
-   - Normalizes nature of work, statuses, and workflow stages.
-   - Calculates financial progress percentage.
-   - Identifies structural data quality issues (e.g. missing Project IDs).
-   - Writes cleaned outputs to a secondary Google Staging Sheet.
-2. **FastAPI Ingestion Endpoint (CLEAN → DATABASE)**:
-   - Reconciles Synthetic IDs (upgrades `OM-ROW-X` to real `MCL-XXXX` IDs when they are finally assigned).
-   - Receives cleaned records and quarantines rows lacking both project IDs and work descriptions.
-   - Resolves dimension IDs for locations, executing agencies, funding sources, work types, and officers.
-   - Computes overdue times and risk ratings.
-
----
-
-## 3. Database Architecture (Star Schema)
-
-Instead of maintaining separate tables for B&R and O&M, we use a **Star Schema** with a unified fact table:
-- **`fact_works`**: Unified central table containing all project parameters. A `branch` column (e.g., `'B&R'` or `'O&M'`) acts as a fast partition key for filtering.
-- **`dim_location`**, **`dim_agency`**, **`dim_fund`**, **`dim_work_type`**, **`dim_officer`**: Dimensions lookup tables referencing specific IDs.
-- **`data_quality`**: Backlog table containing quarantined records that fail project identification.
-- **`sasci_mdf_works`**: Table for road projects tracking km-lengths instead of Lakh outlays.
-
----
-
-## 4. Current Implementation Status
-
-### Phase 1: Star Schema Deployment (Neon/PostgreSQL) — COMPLETE ✅
-- Schema tables, constraints, indexes, and triggers successfully deployed on Neon.
-
-### Phase 2: Apps Script Stage Sync — COMPLETE ✅
-- Apps scripts deployed in Google sheets to staging B&R and O&M rows.
-
-### Phase 3: FastAPI Backend Implementation — COMPLETE ✅
-- **Structure**: Configured with a dedicated virtual environment, standard requirements, lifespan asyncpg pool, and CORS headers.
-- **Sync Endpoints**: `POST /sync/sheets` built to resolve dimensions, calculate risk metrics, and handle upserts/skips atomically inside a transaction.
-- **KPIs Endpoints**: `GET /kpis`, `GET /kpis/constituencies`, `GET /kpis/zones`, `GET /kpis/fund-distribution` built to compute summaries and distributions.
-- **Paginated List Endpoint**: `GET /works` built to join tables and filter records.
-- **Contractor Scorecard Endpoint**: `GET /contractors` built to rank contractor risks.
-- **Quality Endpoint**: `GET /quality` built to output quality statistics and parse error flags.
-- **Sync Status**: `GET /sync/status` built to fetch last synced timestamp.
-
-### Phase 4: Google Apps Script Webhook Trigger Integration — COMPLETE ✅
-- Scheduler configured in Google Apps Script to invoke `POST /sync/sheets`.
-- Differential hash-based sync running smoothly.
-
-### Phase 6: React Dashboard Development — COMPLETE ✅
-- Web interface fully connected to live FastAPI backend data, featuring tabs for:
-  - **Executive Overview**: High-level charts (KPIs, outlays, status funnels, fund distribution).
-  - **Contractor Scorecards**: Performance ratings and risk indexes.
-  - **Constituency Funds**: Outlay distributions by constituency.
-  - **Master Works Directory**: Paginated, filterable grid list.
-  - **Data Quality**: Validation pass rates, quarantined backlog items, and flag frequencies.
-
----
-
-## 5. Next Steps & Action Plan
-
-### Phase 5: SASCI-MDF Road Pipeline Ingestion — PENDING 🔄
-- Set up a separate ingestion route in FastAPI to process raw road rows from the SASCI-MDF tracker.
-- Write records to the `sasci_mdf_works` table.
-- Connect `FlagshipAgenda.tsx` to the new live endpoints and replace mock data.
+| Phase | Description | Target Component | Status | Key Deliverables |
+| :--- | :--- | :--- | :--- | :--- |
+| **Phase 1** | Neon PostgreSQL Star Schema DDL | Database Layer | ✅ **COMPLETE** | `fact_works`, `dim_location`, `dim_agency`, `dim_fund`, `dim_work_type`, `dim_officer`, `fact_works_officers`, `dashboard_users`, `data_quality`. |
+| **Phase 2** | Apps Script Webhook Pipeline | GAS Ingestion Layer | ✅ **COMPLETE** | Overwrite-mode Google Apps Script engine (`code.gs.js`), synthetic ID generator, `X-API-Key` protection header, quality flags (`DELAYED`, `MISSING_DATES`, `INCOMPLETE_DATA`, `SYNTHETIC_ID`, `EXPENDITURE_CONVERTED_FROM_RUPEES`). |
+| **Phase 3** | FastAPI Backend Webhooks & APIs | Backend Service Layer | ✅ **COMPLETE** | `POST /sync/sheets`, `GET /sync/status`, `GET /kpis`, `GET /works`, `GET /works/{work_id}`, `GET /contractors`, `GET /quality`, `GET /kpis/officers`, `parse_officers()` engine. |
+| **Phase 4** | E2E Data Integration Verification | Pipeline Integrity | ✅ **COMPLETE** | Automated hashing differential sync, synthetic ID reconciliation, SSL pooling, date parsing guards. |
+| **Phase 5** | SASCI-MDF Flagship Pipeline | Flagship Road Analytics | 🔄 **PENDING** | `sasci_mdf_works` table, `POST /sync/sasci`, `GET /sasci` router, live `FlagshipAgenda.tsx` integration. |
+| **Phase 6** | Executive React Analytics Dashboard | Frontend UX & Reports | ✅ **COMPLETE** | Vite + React + Tailwind dashboard, `OfficerCommand.tsx` (mirroring `ContractorMatrix.tsx`), global `WorkModalContext`, clickable high-risk rows, portal tooltips, Slate Light Theme redesign (`#f8fafc`). |
+| **Phase 7** | System Authentication & Protection | Security Layer | ✅ **COMPLETE** | `verify_sync_api_key` middleware, `Backend/routers/auth.py` (`POST /auth/login`, `POST /auth/refresh`, `get_current_user` JWT dependency), `create_admin.py` seeder CLI, `AuthContext.tsx` with synchronous reload token check, `ProtectedRoute.tsx`, 401 interceptors. |

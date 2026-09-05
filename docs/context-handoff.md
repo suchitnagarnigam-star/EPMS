@@ -1,7 +1,7 @@
 # MCL Analytics Pipeline — Handoff Document
 **Project:** MCL Development Project Tracker — Data Pipeline
-**Date:** September 4, 2026
-**Status:** Phases 1–4, 6 Complete ✅ | Phase 5 (SASCI-MDF Pipeline) Pending 🔄 | Auth Pending 🔄
+**Date:** September 5, 2026
+**Status:** Phases 1–4, 6, 7 Complete ✅ | Phase 5 (SASCI-MDF Pipeline) Pending 🔄
 
 ---
 
@@ -10,18 +10,19 @@
 ```
 Main Tracker (B&R / O&M tabs)
         ↓
-  Apps Script ETL (code.gs) — every 10 minutes via time-based trigger
-  [OVERWRITE mode — full tab rewrite each sync, no row-by-row upsert]
+  Apps Script ETL (code.gs.js) — every 10 minutes via time-based trigger
+  [OVERWRITE mode — full tab rewrite each sync, X-API-Key protected payload]
         ↓
   Clean Staging Sheet (B&R & O&M tabs) — Sheet ID: 1zpRR55bZywWpwy8iDbgiLrYHRCScc8vPQHkUEYuEgiQ
         ↓
   FastAPI Ingestion Webhook (/sync/sheets) — https://epms-m755.onrender.com (DEV: http://localhost:8000)
+  [X-API-Key middleware security enforced]
         ↓
   Neon PostgreSQL (Star Schema Database) — Singapore region, db: neondb
         ↓
-  Analytics REST API (/kpis, /works, /contractors, /quality, /kpis/officers, /sync/status)
+  Analytics REST API (/auth/*, /kpis, /works, /contractors, /quality, /kpis/officers, /admin/users)
         ↓
-  React Frontend Dashboard — Vite + TypeScript + Tailwind (Live UI connected to backend)
+  React Frontend Dashboard — Vite + TS + Tailwind (JWT Auth, ProtectedRoutes, Slate Light & Dark Themes)
 ```
 
 ---
@@ -36,25 +37,29 @@ Main Tracker (B&R / O&M tabs)
 | Local Backend Server | `http://localhost:8000` |
 | Neon DB | `neondb`, user: `neondb_owner`, region: Singapore |
 | GAS Trigger | `scheduledSync` every 10 minutes |
+| Default Admin Credentials | `admin@mcl.gov.in` / `admin123` (seeded via `create_admin.py`) |
 
 ---
 
 ## 3. API Endpoint Reference
 
-| Endpoint | Method | Purpose | Key Parameters |
+| Endpoint | Method | Purpose | Key Parameters / Security |
 |---|---|---|---|
-| `/sync/sheets` | POST | Receives clean staging rows, upserts to DB | `{ works: [...], quality: [...] }` |
-| `/sync/status` | GET | Returns last synced timestamp + total works count | None |
-| `/kpis` | GET | Dashboard summary cards, distributions | Optional: `branch` |
-| `/kpis/constituencies` | GET | Constituency-level aggregates (cost, expenditure, counts) | Optional: `branch` |
-| `/kpis/zones` | GET | Zone-level avg physical/financial progress by branch | Optional: `branch` |
-| `/kpis/fund-distribution` | GET | Expenditure breakdown by fund type | None |
-| `/kpis/officers` | GET | Supervising officer metrics & workload breakdown | Optional: `designation`, `branch` |
-| `/works` | GET | Paginated works list with dimension joins | `page`, `page_size`, `branch`, `zone`, `constituency`, `delivery_status`, `workflow_stage`, `search`, `officer_id`, `agency_id`, `agency_name`, `sort_by`, `sort_order` |
-| `/works/{work_id}` | GET | Fetch single work details by unique ID | `work_id` |
-| `/contractors` | GET | Agency performance ranked by risk | None |
-| `/quality` | GET | Analytics readiness stats + paginated backlog rows | `page`, `page_size` |
-| `/health` | GET | DB connection health check | None |
+| `/auth/login` | POST | Authenticates user & issues 8h HS256 JWT | `{ email, password }` |
+| `/auth/refresh` | POST | Issues refreshed JWT for active session | `Authorization: Bearer <token>` |
+| `/sync/sheets` | POST | Ingestion webhook, upserts to DB | `X-API-Key` Header required |
+| `/sync/status` | GET | Returns last synced timestamp + total works | `X-API-Key` Header required |
+| `/kpis` | GET | Summary cards & distributions | JWT `Authorization: Bearer` required |
+| `/kpis/constituencies` | GET | Constituency aggregate metrics | JWT `Authorization: Bearer` required |
+| `/kpis/zones` | GET | Zone-level avg progress by branch | JWT `Authorization: Bearer` required |
+| `/kpis/fund-distribution` | GET | Expenditure breakdown by fund type | JWT `Authorization: Bearer` required |
+| `/kpis/officers` | GET | Supervising officer metrics & workload | JWT `Authorization: Bearer` required |
+| `/works` | GET | Paginated works list with dimension joins | `page`, `page_size`, `branch`, `zone`, `officer_id`, `agency_id`, etc. |
+| `/works/{work_id}` | GET | Fetch single work details by ID | `work_id` |
+| `/contractors` | GET | Agency performance ranked by risk | JWT `Authorization: Bearer` required |
+| `/quality` | GET | Analytics readiness stats & backlog rows | JWT `Authorization: Bearer` required |
+| `/admin/users` | GET/POST/PATCH/DELETE | Admin user access management | JWT `Authorization: Bearer` required |
+| `/health` | GET | DB connection health check | Public (no auth required) |
 
 ---
 
@@ -62,67 +67,35 @@ Main Tracker (B&R / O&M tabs)
 
 ### Phase 1 — Neon Star Schema Database
 - All tables deployed: `fact_works`, `dim_location`, `dim_agency`, `dim_fund`, `dim_work_type`, `dim_officer`, `fact_works_officers`, `dashboard_users`, `data_quality`, `sasci_mdf_works`.
-- Indexes, constraints, and `update_updated_at` trigger active.
-- **Junction Table & Officers Schema**:
-  - `dim_officer`: Stores 61 clean individual officer entries (`officer_id`, `officer_name`, `designation`, `branch`).
-  - `fact_works_officers`: Junction table for 1,466 multi-officer assignments (`work_id`, `officer_id`).
-  - `fact_works.ai_remarks`: Added text column for AI summaries/insights.
-- **Column size fixes applied** (all via `ALTER TABLE`):
-  - `dim_location.sub_zone`: varchar(10) → 100
-  - `dim_location.zone`: varchar(2) → 100
-  - `dim_location.ward`: varchar(50) → 200
-  - `fact_works.work_id`: varchar(20) → 50
-  - `fact_works.delivery_status`: varchar(50) → 200
-  - `fact_works.workflow_stage`: varchar(80) → 200
-  - `fact_works.resolution_no_date`: varchar(100) → 500
-- `DEALLOCATE ALL` required after schema changes to clear asyncpg statement cache.
+- Schema DDL columns updated (`password_hash` added to `dashboard_users`).
 
-### Phase 2 — Google Apps Script ETL (`code.gs`)
-- Reads B&R and O&M tabs from main tracker every 10 minutes.
-- **OVERWRITE mode**: staging tab is fully cleared and rewritten on each sync (`clearContents()` at top of `scheduledSync()`).
-- **Synthetic ID Generation**: Automatically assigns `OM-ROW-X` or `BR-ROW-X` to rows lacking a project ID, marking them with `id_type: "SYNTHETIC"`.
-- Canonical maps for `nature_of_work`, `workflow_stage`, `delivery_status`.
-- **Expanded Data Quality Flags**:
-  - `MISSING_PROJECT_ID`, `SYNTHETIC_ID`, `UNMAPPED_*`, `UNRESOLVED_LOCATION`, `MISSING_AGENCY`, `FIN_PROGRESS_ANOMALY`, `EXPENDITURE_OUTLIER`, `EXPENDITURE_CONVERTED_FROM_RUPEES`.
-  - `DELAYED`: Scheduled end date > 30 days past and physical progress < 100%.
-  - `MISSING_DATES`: Start date or end date is blank/missing.
-  - `INCOMPLETE_DATA`: Agency, fund type, or zone is missing.
-- **Expenditure guard**: Auto-converts values when expenditure > tender cost × 2 by dividing by 100,000.
-- Calls `pushToFastAPI()` **once at end of `scheduledSync()`**.
+### Phase 2 — Google Apps Script ETL (`code.gs.js`)
+- `pushToFastAPI()` updated to include `'X-API-Key': SYNC_API_KEY` header loaded from `PropertiesService.getScriptProperties().getProperty('SYNC_API_KEY')`.
+- Start date fallback: parses dates from `work_order_no_date` when `start_date` is empty before checking quality flags.
 
-### Phase 3 — FastAPI Backend (`sync.py` and routers)
-- Asyncpg pool with Neon SSL compatibility.
-- **Advanced Multi-Officer Parsing (`parse_officers()`)**:
-  - Multi-delimiter pre-processing (`/`, `-XEN`, `-SDO`, `-JE`, `,`, `;`, `and`, `&`) and surname boundary splitting (`Singh`, `Sharma`, `Sethi`, `Pathak`, `Ram`, `Garcha`, `Kumar`, `Juneja`, `Sikka`, `Grewal`, `Sodhi`, `Kaur`).
-  - Upserts 61 distinct clean officer names into `dim_officer`, updates primary officer FK `fact_works.officer_id` (448 works linked), and populates `fact_works_officers` junction table (1,466 assignments).
-- **Pydantic Alias Fix (`Backend/models.py`)**:
-  - Added `'supervising_officer'` to `AliasChoices` in `WorkSyncItem` to ensure payload ingestion maps officer data from GAS sync payloads seamlessly.
-- **Synthetic ID Reconciliation**: Upgrades `OM-ROW-X` to real project IDs without duplicating history.
-- `GET /kpis/officers`: Provides aggregate metrics per officer filtered by designation or branch.
-- `GET /works/{work_id}`: Dedicated detail endpoint for single work lookup.
-- `GET /works` enhancements: Added `officer_id`, `agency_id`, and exact `agency_name` filtering.
+### Phase 3 & 7 — FastAPI Backend (`main.py`, `routers/auth.py`, `sync.py`)
+- **Part A — GAS Sync API Key Protection**:
+  - Middleware `verify_sync_api_key` enforces `X-API-Key` header matching `SYNC_API_KEY` environment variable on all `/sync/*` requests. Returns HTTP 403 Forbidden if missing or invalid. Bypasses for `/health` and dashboard APIs.
+- **Part B — Dashboard JWT Authentication**:
+  - Dependencies installed: `python-jose[cryptography]`, `passlib[bcrypt]`, `bcrypt`.
+  - `Backend/routers/auth.py`: Implemented `/auth/login` (verifies bcrypt password hashes, issues 8-hour HS256 JWTs), `/auth/refresh`, and `get_current_user` dependency.
+  - Registered `auth.router` and applied `Depends(get_current_user)` to all dashboard routers (`/kpis`, `/works`, `/contractors`, `/quality`, `/admin`). `/health` and `/auth/*` remain public.
+  - CLI Seeder (`Backend/create_admin.py`): Standalone script to seed or update admin users with bcrypt hashed passwords in `dashboard_users`.
+- **Date Fallback in Sync**:
+  - Updated `compute_days_overdue` in `sync.py` to derive target end dates using `work_order_no_date` + `time_limit_months` when explicit scheduled end dates are missing.
 
-### Phase 4 — GAS → FastAPI → Neon Pipeline Verified
-- End-to-end pipeline functioning cleanly.
-- Sync processing verified with automated hash-differential row upserts and quarantine logic.
-
-### Phase 6 — React Dashboard & Sprints 1–4 Enhancements
-- Full frontend dashboard built using React, Vite, Tailwind CSS, Recharts.
-- **Officer Performance Command (`OfficerCommand.tsx`)**:
-  - Completely redesigned to 100% mirror the layout and features of `ContractorMatrix.tsx`.
-  - 4 KPI summary cards (Healthy, Moderate Workload, High Risk, Unassigned).
-  - Interactive Recharts Top 20 bar chart with segmented toggle (🔴 Top 20 by Risk / 🟢 Top 20 by Progress).
-  - Master Directory table with designation tabs (`All`, `JE`, `SDO`, `XEN`, `EE`), search input, and export button.
-  - Health rating badges (`Healthy`, `Moderate`, `High Risk`).
-  - Two-level expandable works sub-table with click-to-modal triggers (`useWorkModal().openWorkModal`).
-- **Global WorkModal Context (`WorkModalContext.tsx`)**: Application-wide provider to trigger `WorkDetailModal` from any component/table row via `useWorkModal().openWorkModal(workId)`. Fetches fresh record on demand via `GET /works/{work_id}`.
-- **WorkDetailModal Risk Ring UI Polish**: Dynamically scaled font sizes (`text-[12px]`, `text-[14px]`, `text-[18px]`) based on score string length, preventing text overflow and vertical overlap inside the SVG risk circle.
-- **Contractor Matrix Drilldown (`ContractorMatrix.tsx`)**: Two-level drilldown (Contractor list → Inline expanded works using exact `agency_name` filter → Work detail modal).
-- **Executive Overview Enhancements (`ExecutiveOverview.tsx`)**: Clickable high-risk rows, dynamic Y-axis calculation for Zone chart (`maxZoneVal * 1.15`), filtered 0-expenditure fund types sorted by spend.
-- **Master Works Directory (`MasterWorksDirectory.tsx`)**: Integrated global modal context and added banner notification for `officer_id` URL query filter.
-- **Dynamic API Routing (`apiConfig.ts`)**: DEV builds automatically target local backend (`http://localhost:8000`) while PROD targets Render.
-- **Warm Beige Theme Engine**: Light theme (`[data-theme="light"]`) with warm stone palette (`#f5f2eb`), dark stone typography (`#1c1917`), and warm indigo accents (`#3551e0`).
-- **React Portal Tooltips (`MethodologyTooltip.tsx`)**: Renders metric popovers via `createPortal` to `document.body`, immune to `overflow: hidden` containers.
+### Phase 4 & 6 — React Dashboard & UI Enhancements
+- **JWT Auth Context & Protection (`AuthContext.tsx`, `ProtectedRoute.tsx`)**:
+  - `AuthContext`: Manages `mcl_auth_token` in `localStorage`. Evaluates `isTokenValid(savedToken)` synchronously on initial load to ensure instant redirect to `/login` if token is missing or expired.
+  - Active expiration monitor checks token validity every 10 seconds and on window focus.
+  - `apiFetch` interceptor automatically clears token and redirects to `/login` on HTTP 401 Unauthorized responses.
+  - `ProtectedRoute`: Guards all dashboard routes in `App.tsx`, directing unauthenticated users to `/login`.
+- **Light Theme Redesign (`index.css`)**:
+  - Replaced warm beige with a soothing Slate 50 palette (`#f8fafc` backdrop, pure white cards `#ffffff`, Slate 200 borders `#e2e8f0`, Slate 900 `#0f172a` contrast text, soft badge tints).
+- **Start Date Fallback in UI (`WorkDetailModal.tsx`)**:
+  - Automatically extracts date from `work_order_no_date` if `start_date` is empty and displays as `02-12-2024 (WO Date)`.
+- **Risk Score Circular Gauge UI Fix (`WorkDetailModal.tsx`)**:
+  - SVG `viewBox="0 0 96 96"`, centered geometry, `stroke="var(--border)"` background ring, score number formatting (`riskScore.toFixed(1)` / integer string), font scaling to prevent text clipping/overlap (e.g. `281.5 SCORE`).
 
 ---
 
@@ -132,70 +105,35 @@ Main Tracker (B&R / O&M tabs)
 |---|---|---|
 | `fact_works` | 1,120 | Live production data |
 | `dim_location` | 208 | Normalized constituency names (`INITCAP(TRIM())`) |
-| `dim_agency` | 264 | |
-| `dim_fund` | 51 | |
-| `dim_work_type` | — | |
-| `dim_officer` | 61 | Clean individual officer records (`JE`, `SDO`, `XEN`, `EE`, `SE`) |
-| `fact_works_officers` | 1,466 | Junction table linking multi-officer assignments |
-| `dashboard_users` | Active | Admin & user email access management table |
-| `data_quality` | Active | Unique constraint `(source_sheet, source_row, flags)` applied |
+| `dim_agency` | 264 | Executing agency dimension |
+| `dim_fund` | 51 | Fund type dimension |
+| `dim_officer` | 61 | Clean individual officer records |
+| `fact_works_officers` | 1,466 | Multi-officer assignment junction table |
+| `dashboard_users` | Active | User accounts table with `password_hash` column |
+| `data_quality` | Active | Quarantined rows & ingestion anomaly flags |
 | `sasci_mdf_works` | 0 | Phase 5 pending |
 
 ---
 
-## 6. Open Bugs & Resolved Issues
-
-### Resolved Issues ✅
-1. **Officer Multi-Name Concatenation & Empty Officers Tab**: Updated `parse_officers()` to split multi-officer strings cleanly by delimiter and surname boundary, added `supervising_officer` Pydantic alias, and completed DB migration (61 clean officers, 1,466 junction rows).
-2. **Officer Command UI Redesign**: Redesigned `OfficerCommand.tsx` to 100% mirror `ContractorMatrix.tsx` (KPI cards, Top 20 bar chart, health badges, segmented tabs, expandable works sub-tables).
-3. **Modal Risk Score UI Overlap**: Dynamically scaled font sizes (`text-[12px]`, `text-[14px]`, `text-[18px]`) in `WorkDetailModal.tsx` SVG ring.
-4. **Contractor Works Count Mismatch**: Replaced broad text `search` with exact `agency_name` filter in `GET /works`.
-5. **MCL-0357 Bad Date / Risk Score Spike**: Fixed via regex string cleaning, Year ≥ 2000 date guard in `parse_date_safe`, and database cleanup for pre-guard date artifacts (`1900-01-10`).
-6. **Tooltip Popover Clipping**: Solved by portaling tooltips to `document.body` via `createPortal`.
-7. **Data Quality Duplicate Accumulation**: Unique constraint applied to `data_quality`.
-
----
-
-## 7. Key Architecture Decisions & Gotchas
-
-- **Officer Multi-Delimiter Parsing**: Officer strings contain slashes, hyphens, and unpunctuated multi-person names. Surnames (`Singh`, `Sharma`, `Sethi`, `Pathak`, `Ram`, `Garcha`, `Kumar`, `Juneja`, `Sikka`, `Grewal`, `Sodhi`, `Kaur`) act as natural name boundaries.
-- **Global Work Detail Modal**: Uses `WorkModalContext` to decouple modal state from individual table components. Modal fetches single work data on demand using `GET /works/{work_id}`.
-- **Exact Agency & Officer Matching**: Searching by agency or officer uses exact IDs/names rather than broad text search to prevent substring collisions.
-- **React Portals for Floating UI**: Floating popovers/tooltips must use `createPortal(..., document.body)` with `fixed` positioning and `getBoundingClientRect()`.
-- **Date Validation Rule**: Any date parsed before year 2000 is rejected in `models.py` as Excel serial date corruption (`10/01/1900`).
-
----
-
-## 8. Next Steps & Remaining Work 🔄
+## 6. Next Steps & Remaining Work 🔄
 
 ### Phase 5 — SASCI-MDF Road Pipeline
 - Create `Backend/routers/sasci.py` — new FastAPI router (`POST /sync/sasci`, `GET /sasci`).
 - Add GAS section to read SASCI-MDF tab and push to `/sync/sasci`.
 - Update `FlagshipAgenda.tsx` to consume live SASCI data instead of mock data.
-- Note: SASCI-MDF uses km-based units — incompatible with lacs-based works data; lives in its own `sasci_mdf_works` table.
-
-### Phase 7 — Authentication
-Two separate auth concerns:
-
-**A. GAS Sync Auth (API Key)**
-- Add `X-API-Key` header validation middleware to FastAPI.
-- Store key in Render environment variables.
-- Update GAS `pushToFastAPI()` to send the header.
-
-**B. Dashboard Auth (JWT / Sessions)**
-- Add user authentication (login page, JWT tokens, protected routes).
-- Wire `dashboard_users` table with login & role-based access control.
 
 ---
 
-## 9. How to Run Locally
+## 7. How to Run Locally
 
 ```bash
 # From project root — starts frontend (port 5173) and backend (port 8000) concurrently
 npm run dev:full
 ```
 
-Backend `.env` at `Backend/.env`:
+Environment variables needed in `Backend/.env`:
 ```env
-DATABASE_URL=postgresql://<user>:<password>@<host>/neondb?sslmode=require
+DATABASE_URL=postgresql://neondb_owner:...@epms...singapore.aws.neon.tech/neondb?sslmode=require
+SYNC_API_KEY=your_random_sync_api_key_32_chars
+JWT_SECRET=your_random_jwt_secret_32_chars
 ```
